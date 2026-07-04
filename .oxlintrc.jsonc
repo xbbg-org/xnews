@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "import", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+  },
+  "options": {
+    "denyWarnings": true,
+    "typeAware": true,
+    "typeCheck": true,
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**"],
+  "rules": {
+    // This package intentionally exposes named public APIs.
+    "import/no-named-export": "off",
+    // Re-export barrels and fixture files are clearer than synthetic defaults here.
+    "import/group-exports": "off",
+    // Single-export modules still participate in the named public API surface.
+    "import/prefer-default-export": "off",
+    // Utilities export near their definitions to keep parser/helper files navigable.
+    "import/exports-last": "off",
+    // The watcher loop is intentionally sequential: load, yield, then sleep.
+    "no-await-in-loop": "off",
+  },
+}
