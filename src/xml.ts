@@ -8,6 +8,8 @@ export interface RssParseOptions {
   sourceFallback: string;
   ticker?: string;
   limit?: number;
+  /** Rewrite an item URL from its decoded link and guid, e.g. to unwrap redirect links. */
+  resolveUrl?: (link: string, guid: string) => string;
 }
 
 export interface AtomParseOptions {
@@ -16,6 +18,8 @@ export interface AtomParseOptions {
   sourceFallback: string;
   ticker?: string;
   limit?: number;
+  /** Extra tags to read a per-entry source name from before falling back. */
+  sourceTags?: readonly string[];
 }
 
 export function parseRssItems(xml: string, options: RssParseOptions): NewsItem[] {
@@ -33,15 +37,16 @@ export function parseRssItems(xml: string, options: RssParseOptions): NewsItem[]
     const source = cleanText(readTag(block, "source")) || options.sourceFallback;
     const publishedAt = toIsoDate(pubDate);
     const decodedLink = decodeEntities(link);
+    const url = options.resolveUrl?.(decodedLink, guid) ?? decodedLink;
 
     items.push({
       id: stableId([options.provider, guid || link, title]),
       provider: options.provider,
-      kind: options.kind ?? inferKind(source, title, link),
+      kind: options.kind ?? inferNewsKind(source, title, url),
       title,
-      url: decodedLink,
+      url,
       source,
-      ...(options.provider !== "google-news" ? { canonicalUrl: decodedLink } : {}),
+      ...(options.provider !== "google-news" ? { canonicalUrl: url } : {}),
       ...(options.ticker ? { ticker: options.ticker.toUpperCase() } : {}),
       ...(publishedAt ? { publishedAt } : {}),
       ...(pubDate ? { publishedAtText: pubDate } : {}),
@@ -62,12 +67,13 @@ export function parseAtomEntries(xml: string, options: AtomParseOptions): NewsIt
     const link = readAtomLink(block);
     if (!title || !link) continue;
 
-    const updated = cleanText(readTag(block, "updated"));
+    const updated = cleanText(readTag(block, "updated")) || cleanText(readTag(block, "published"));
     const summary = cleanText(readTag(block, "summary"));
     const accessionNumber = cleanText(readTag(block, "accession-number"));
     const formType = cleanText(readTag(block, "filing-type")) || readCategoryTerm(block);
     const publishedAt = toIsoDate(updated);
     const decodedLink = decodeEntities(link);
+    const source = readFirstTag(block, options.sourceTags ?? []) || options.sourceFallback;
 
     items.push({
       id: stableId([options.provider, accessionNumber || link, title]),
@@ -76,7 +82,7 @@ export function parseAtomEntries(xml: string, options: AtomParseOptions): NewsIt
       title,
       url: decodedLink,
       canonicalUrl: decodedLink,
-      source: options.sourceFallback,
+      source,
       ...(options.ticker ? { ticker: options.ticker.toUpperCase() } : {}),
       ...(publishedAt ? { publishedAt } : {}),
       ...(updated ? { publishedAtText: updated } : {}),
@@ -88,6 +94,14 @@ export function parseAtomEntries(xml: string, options: AtomParseOptions): NewsIt
     if (limit !== undefined && items.length >= limit) break;
   }
   return items;
+}
+
+function readFirstTag(block: string, tags: readonly string[]): string {
+  for (const tag of tags) {
+    const value = cleanText(readTag(block, tag));
+    if (value) return value;
+  }
+  return "";
 }
 
 function* matchBlocks(xml: string, tag: string): Generator<string> {
@@ -127,7 +141,7 @@ function toIsoDate(value: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function inferKind(source: string, title: string, link: string): NewsKind {
+export function inferNewsKind(source: string, title: string, link: string): NewsKind {
   const combined = `${source} ${title} ${link}`.toLowerCase();
   if (
     combined.includes("business wire") ||

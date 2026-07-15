@@ -1,0 +1,382 @@
+import { expect, test } from "bun:test";
+import {
+  buildCompanyNewsFeedResult,
+  buildTopicNewsFeedResult,
+  FIXED_FEED_PROVIDERS,
+  FIXED_FEEDS,
+  parseBingNews,
+  parseCourtListenerNews,
+  parseFederalRegisterNews,
+  parseFixedFeedNews,
+  parseGdeltNews,
+  parseHackerNewsStories,
+  parseNasdaqNews,
+  parseSecFullTextFilings,
+  parseSeekingAlphaNews,
+  parseTickerTickNews,
+  parseYahooSearchNews,
+  providerCapabilities,
+  subjectMatcher,
+} from "../src";
+import {
+  bingRssFixture,
+  courtListenerAtomFixture,
+  emptyRssFixture,
+  federalRegisterJsonFixture,
+  gdeltJsonFixture,
+  hackerNewsJsonFixture,
+  marketFeedRssFixture,
+  nasdaqRssFixture,
+  secFullTextJsonFixture,
+  seekingAlphaRssFixture,
+  tickerTickJsonFixture,
+  yahooSearchJsonFixture,
+} from "./fixtures";
+
+function fetchInputUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+test("parses Bing News RSS and unwraps redirect links", () => {
+  const items = parseBingNews(bingRssFixture);
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "bing-news",
+    title: "Reinsurance Group of America prices senior notes offering",
+    url: "https://www.example.com/rga-notes-offering",
+    canonicalUrl: "https://www.example.com/rga-notes-offering",
+    source: "Example Wire",
+    publishedAt: "2026-07-13T15:00:00.000Z",
+  });
+  expect(items[1]?.url).toBe("https://www.example.org/insurance-stocks-steady");
+  expect(items[1]?.source).toBe("Bing News");
+});
+
+test("parses TickerTick stories with related tickers and epoch timestamps", () => {
+  const items = parseTickerTickNews(tickerTickJsonFixture, "rga");
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "tickertick",
+    title: "Reinsurance Group of America (NYSE:RGA) Hits New 1-Year High",
+    url: "https://www.marketbeat.com/instant-alerts/rga-hits-new-1-year-high-2026-07-13/",
+    source: "marketbeat.com",
+    ticker: "RGA",
+    publishedAt: new Date(1783954841000).toISOString(),
+    summary: "RGA reaches a new 52-week high.",
+    relatedTickers: ["RGA"],
+  });
+  expect(items[1]?.relatedTickers).toEqual(["EG", "RGA"]);
+  expect(() => parseTickerTickNews("rate limited", "rga")).toThrow(/non-JSON TickerTick/);
+});
+
+test("parses GDELT article lists with seendate timestamps", () => {
+  const items = parseGdeltNews(gdeltJsonFixture);
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "gdelt",
+    title: "Global reinsurance outlook improves",
+    url: "https://www.example.com/global-reinsurance-outlook",
+    source: "example.com",
+    publishedAt: "2026-07-13T22:15:00.000Z",
+    publishedAtText: "20260713T221500Z",
+  });
+  expect(() => parseGdeltNews("Please limit requests")).toThrow(/non-JSON GDELT/);
+});
+
+test("parses Hacker News stories and falls back to discussion links", () => {
+  const items = parseHackerNewsStories(hackerNewsJsonFixture);
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "hacker-news",
+    title: "Insurance modeling with open data",
+    url: "https://blog.example.com/insurance-modeling",
+    source: "Hacker News",
+    publishedAt: "2026-07-13T18:45:00.000Z",
+  });
+  expect(items[1]?.url).toBe("https://news.ycombinator.com/item?id=48913907");
+});
+
+test("parses Yahoo search news with publisher and related tickers", () => {
+  const items = parseYahooSearchNews(yahooSearchJsonFixture);
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "yahoo-search",
+    title: "RGA Outperforms Industry, Hits 52-Week High",
+    source: "Zacks",
+    publishedAt: new Date(1783954800 * 1000).toISOString(),
+    relatedTickers: ["MFC", "RGA"],
+  });
+  expect(items[1]?.source).toBe("Business Wire");
+  expect(items[1]?.kind).toBe("press-release");
+});
+
+test("parses SEC full-text hits into archive filing links", () => {
+  const items = parseSecFullTextFilings(secFullTextJsonFixture, { ticker: "rga" });
+
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({
+    provider: "sec-fulltext",
+    kind: "filing",
+    title: "8-K - Reinsurance Group of America, Incorporated  (RGA)",
+    url: "https://www.sec.gov/Archives/edgar/data/898174/000119312526123456/d123456d8k.htm",
+    source: "SEC EDGAR",
+    ticker: "RGA",
+    formType: "8-K",
+    accessionNumber: "0001193125-26-123456",
+    cik: "898174",
+    filingDate: "2026-06-22",
+    summary: "CURRENT REPORT",
+  });
+  expect(items[0]?.publishedAt).toBe("2026-06-22T00:00:00.000Z");
+});
+
+test("parses Federal Register documents with agency sources", () => {
+  const items = parseFederalRegisterNews(federalRegisterJsonFixture);
+
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({
+    provider: "federal-register",
+    title: "Rule: Credit for Reinsurance Model Regulation Updates",
+    url: "https://www.federalregister.gov/documents/2026/07/01/2026-12345/credit-for-reinsurance",
+    source: "Treasury Department",
+    summary: "Final rule updating credit for reinsurance requirements.",
+    publishedAt: "2026-07-01T00:00:00.000Z",
+  });
+});
+
+test("parses CourtListener entries using published dates and court authors", () => {
+  const items = parseCourtListenerNews(courtListenerAtomFixture);
+
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({
+    provider: "courtlistener",
+    kind: "article",
+    title: "In Re Reinsurance Group of America v. Example State",
+    url: "https://www.courtlistener.com/opinion/1234567/rga-v-example-state/",
+    source: "Missouri Court of Appeals",
+    publishedAt: "2026-06-20T07:00:00.000Z",
+  });
+});
+
+test("parses Nasdaq per-symbol RSS items", () => {
+  const items = parseNasdaqNews(nasdaqRssFixture, "rga");
+
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({
+    provider: "nasdaq",
+    title: "RGA Outperforms Industry After Strong Quarter",
+    url: "https://www.nasdaq.com/articles/rga-outperforms-industry-after-strong-quarter",
+    source: "Nasdaq",
+    ticker: "RGA",
+  });
+});
+
+test("parses Seeking Alpha items and restores per-story URLs from guids", () => {
+  const items = parseSeekingAlphaNews(seekingAlphaRssFixture, "RGA");
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "seeking-alpha",
+    title: "Reinsurance Group of America appoints new CFO",
+    url: "https://seekingalpha.com/MarketCurrent:4605518",
+    ticker: "RGA",
+  });
+  expect(items[1]?.url).toBe(
+    "https://seekingalpha.com/article/4904996-rga-q1-financial-instruments?source=feed_symbol_RGA",
+  );
+});
+
+test("fixed feeds filter company subjects by name and boundary-safe ticker", () => {
+  const items = parseFixedFeedNews("marketwatch", marketFeedRssFixture, {
+    ticker: "RGA",
+    companyName: "Reinsurance Group of America",
+  });
+
+  expect(items.map((item) => item.title)).toEqual([
+    "Reinsurance Group of America raises dividend",
+    "Insurers rally as rates stabilize (NYSE:RGA)",
+  ]);
+  expect(items[0]?.provider).toBe("marketwatch");
+  expect(items[0]?.source).toBe("MarketWatch");
+});
+
+test("fixed feeds filter topic subjects by all query tokens", () => {
+  const items = parseFixedFeedNews("guardian", marketFeedRssFixture, {
+    query: "insurance regulation",
+  });
+
+  expect(items.map((item) => item.title)).toEqual(["ARGAN wins construction award"]);
+});
+
+test("press-release wires mark filtered items as press releases", () => {
+  const items = parseFixedFeedNews("pr-newswire", marketFeedRssFixture, { ticker: "RGA" });
+
+  expect(items).toHaveLength(1);
+  expect(items[0]?.kind).toBe("press-release");
+  expect(items[0]?.source).toBe("PR Newswire");
+});
+
+test("subject matcher requires cashtag or exchange context for single-letter tickers", () => {
+  const matches = subjectMatcher({ ticker: "A" });
+
+  expect(matches({ title: "A big day for markets" })).toBe(false);
+  expect(matches({ title: "Agilent (NYSE:A) reports earnings" })).toBe(true);
+  expect(matches({ title: "Traders pile into $A calls" })).toBe(true);
+  expect(matches({ title: "Watching RGA today" })).toBe(false);
+});
+
+test("every fixed feed provider has capabilities, urls, and a label", () => {
+  for (const provider of FIXED_FEED_PROVIDERS) {
+    expect(providerCapabilities(provider)).toEqual(["company", "topic"]);
+    expect(FIXED_FEEDS[provider].urls.length).toBeGreaterThan(0);
+    expect(FIXED_FEEDS[provider].label.length).toBeGreaterThan(0);
+  }
+});
+
+test("new query providers expose expected capabilities", () => {
+  expect(providerCapabilities("bing-news")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("gdelt")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("tickertick")).toEqual(["company"]);
+  expect(providerCapabilities("hacker-news")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("yahoo-search")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("sec-fulltext")).toEqual(["company", "topic", "filing"]);
+  expect(providerCapabilities("federal-register")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("courtlistener")).toEqual(["company", "topic"]);
+  expect(providerCapabilities("nasdaq")).toEqual(["company"]);
+  expect(providerCapabilities("seeking-alpha")).toEqual(["company"]);
+});
+
+test("company feed integrates new providers through injected fetch", async () => {
+  const fetchedUrls: string[] = [];
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    companyName: "Reinsurance Group of America",
+    sources: ["tickertick", "bing-news", "sec-fulltext", "seeking-alpha", "marketwatch"],
+    fetch: async (input) => {
+      const href = fetchInputUrl(input);
+      fetchedUrls.push(href);
+      if (href.includes("api.tickertick.com")) return new Response(tickerTickJsonFixture);
+      if (href.includes("bing.com")) return new Response(bingRssFixture);
+      if (href.includes("efts.sec.gov")) return new Response(secFullTextJsonFixture);
+      if (href.includes("seekingalpha.com")) return new Response(seekingAlphaRssFixture);
+      if (href.includes("mw_topstories")) return new Response(marketFeedRssFixture);
+      if (href.includes("feeds.content.dowjones.io")) return new Response(emptyRssFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  expect(result.partial).toBe(false);
+  expect(result.providers).toHaveLength(5);
+  for (const provider of result.providers) {
+    expect(provider.status).toBe("ok");
+    expect(provider.itemCount).toBeGreaterThan(0);
+  }
+  const marketwatch = result.providers.find((provider) => provider.provider === "marketwatch");
+  expect(marketwatch?.requestUrls).toEqual(FIXED_FEEDS.marketwatch.urls);
+  expect(fetchedUrls.filter((url) => url.includes("feeds.content.dowjones.io"))).toHaveLength(4);
+  const providers = new Set(result.items.map((item) => item.provider));
+  expect(providers).toEqual(
+    new Set(["tickertick", "bing-news", "sec-fulltext", "seeking-alpha", "marketwatch"]),
+  );
+});
+
+test("topic feeds support query providers and filtered fixed feeds", async () => {
+  const result = await buildTopicNewsFeedResult({
+    query: "insurance regulation",
+    sources: ["hacker-news", "federal-register", "guardian", "nasdaq"],
+    fetch: async (input) => {
+      const href = fetchInputUrl(input);
+      if (href.includes("hn.algolia.com")) return new Response(hackerNewsJsonFixture);
+      if (href.includes("federalregister.gov")) return new Response(federalRegisterJsonFixture);
+      if (href.includes("theguardian.com")) return new Response(marketFeedRssFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  const statusByProvider = new Map(
+    result.providers.map((provider) => [provider.provider, provider.status]),
+  );
+  expect(statusByProvider.get("hacker-news")).toBe("ok");
+  expect(statusByProvider.get("federal-register")).toBe("ok");
+  expect(statusByProvider.get("guardian")).toBe("ok");
+  expect(statusByProvider.get("nasdaq")).toBe("unsupported");
+  expect(result.warnings).toEqual(["nasdaq: topic subjects are unsupported"]);
+});
+
+test("company requirements surface unsupported reasons for missing fields", async () => {
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "",
+    companyName: "Reinsurance Group of America",
+    sources: ["tickertick", "federal-register", "gdelt"],
+    fetch: async (input) => {
+      const href = fetchInputUrl(input);
+      if (href.includes("federalregister.gov")) return new Response(federalRegisterJsonFixture);
+      if (href.includes("gdeltproject.org")) return new Response(gdeltJsonFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  const tickertick = result.providers.find((provider) => provider.provider === "tickertick");
+  expect(tickertick?.status).toBe("unsupported");
+  expect(tickertick?.warnings).toEqual(["tickertick: company ticker is required"]);
+  expect(
+    result.providers.find((provider) => provider.provider === "federal-register")?.status,
+  ).toBe("ok");
+  expect(result.providers.find((provider) => provider.provider === "gdelt")?.status).toBe("ok");
+
+  const nameless = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    sources: ["federal-register", "courtlistener"],
+    fetch: async () => {
+      throw new Error("should not fetch");
+    },
+  });
+  for (const provider of nameless.providers) {
+    expect(provider.status).toBe("unsupported");
+    expect(provider.warnings).toEqual([`${provider.provider}: companyName is required`]);
+  }
+});
+
+test("date windows propagate into query provider request urls", async () => {
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    companyName: "Reinsurance Group of America",
+    sources: ["sec-fulltext", "gdelt", "federal-register", "courtlistener"],
+    since: "2026-06-01T00:00:00.000Z",
+    until: "2026-07-01T00:00:00.000Z",
+    secForms: ["8-K"],
+    fetch: async (input) => {
+      const href = fetchInputUrl(input);
+      if (href.includes("efts.sec.gov")) return new Response(secFullTextJsonFixture);
+      if (href.includes("gdeltproject.org")) return new Response(gdeltJsonFixture);
+      if (href.includes("federalregister.gov")) return new Response(federalRegisterJsonFixture);
+      if (href.includes("courtlistener.com")) return new Response(courtListenerAtomFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  const urlByProvider = new Map(
+    result.providers.map((provider) => [provider.provider, provider.requestUrls[0] ?? ""]),
+  );
+  expect(urlByProvider.get("sec-fulltext")).toContain("dateRange=custom");
+  expect(urlByProvider.get("sec-fulltext")).toContain("startdt=2026-06-01");
+  expect(urlByProvider.get("sec-fulltext")).toContain("enddt=2026-07-01");
+  expect(urlByProvider.get("sec-fulltext")).toContain("forms=8-K");
+  expect(urlByProvider.get("gdelt")).toContain("startdatetime=20260601000000");
+  expect(urlByProvider.get("gdelt")).toContain("enddatetime=20260701000000");
+  expect(urlByProvider.get("federal-register")).toContain(
+    "conditions%5Bpublication_date%5D%5Bgte%5D=2026-06-01",
+  );
+  expect(urlByProvider.get("courtlistener")).toContain("filed_after=2026-06-01");
+
+  const secFullText = result.providers.find((provider) => provider.provider === "sec-fulltext");
+  expect(secFullText?.status).toBe("ok");
+  expect(secFullText?.items[0]?.publishedAt).toBe("2026-06-22T00:00:00.000Z");
+});

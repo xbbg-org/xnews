@@ -1,7 +1,7 @@
 {
   "name": "@xbbg/xnews",
   "version": "0.1.0",
-  "description": "Build market news feeds from free public sources: Yahoo Finance RSS, Google News RSS, SEC EDGAR, and Finviz.",
+  "description": "Build market news feeds from free public sources: Yahoo Finance, Google News, Bing News, SEC EDGAR (filings, full-text search, and press releases), Finviz, Nasdaq, Seeking Alpha, TickerTick, GDELT, Hacker News, Federal Register, CourtListener, and major market, wire, and business feeds.",
   "files": [
     "dist"
   ],
@@ -24,7 +24,8 @@
     "format:check": "oxfmt --config .oxfmtrc.json --check .",
     "check": "bun run typecheck && bun run lint && bun run format:check",
     "test": "bun test",
-    "smoke:rga": "bun run ./scripts/smoke-rga.ts"
+    "smoke:rga": "bun run ./scripts/smoke-rga.ts",
+    "smoke:sources": "bun run ./scripts/smoke-sources.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

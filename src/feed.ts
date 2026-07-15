@@ -1,9 +1,21 @@
 import { classifyMarketEvent } from "./classify";
 import { normalizeDateWindow, normalizeLimit, type DateWindow } from "./options";
+import { fetchBingNews, bingNewsRssUrl } from "./sources/bing";
+import { fetchCourtListenerNews, courtListenerSearchUrl } from "./sources/courtlistener";
+import { fetchFederalRegisterNews, federalRegisterSearchUrl } from "./sources/federalregister";
 import { fetchFinvizNews, finvizQuoteUrl } from "./sources/finviz";
+import { FIXED_FEEDS, fetchFixedFeedNews, isFixedFeedProvider } from "./sources/fixedfeeds";
+import { fetchGdeltNews, gdeltDocUrl } from "./sources/gdelt";
 import { fetchGoogleNews, googleNewsRssUrl } from "./sources/google";
+import { fetchHackerNewsStories, hackerNewsSearchUrl } from "./sources/hackernews";
+import type { SubjectMatchTerms } from "./sources/match";
+import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq";
 import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec";
+import { fetchSecFullTextFilings, secFullTextSearchUrl } from "./sources/secfulltext";
+import { fetchSeekingAlphaNews, seekingAlphaRssUrl } from "./sources/seekingalpha";
+import { fetchTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick";
 import { fetchYahooFinanceNews, yahooFinanceRssUrl } from "./sources/yahoo";
+import { fetchYahooSearchNews, yahooSearchUrl } from "./sources/yahoosearch";
 import type {
   CompanyNewsQuery,
   CompanyNewsSubjectInput,
@@ -34,6 +46,38 @@ const DEFAULT_COMPANY_SOURCES: readonly NewsProvider[] = [
 ];
 const DEFAULT_TOPIC_SOURCES: readonly NewsProvider[] = ["google-news"];
 const PARTIAL_STATUSES = new Set(["error", "unsupported", "partial", "disabled"]);
+
+const QUERY_PROVIDER_CAPABILITIES: Partial<
+  Record<NewsProvider, readonly NewsProviderCapability[]>
+> = {
+  "yahoo-finance": ["company"],
+  "google-news": ["company", "topic"],
+  "sec-edgar": ["company", "filing"],
+  finviz: ["company"],
+  "bing-news": ["company", "topic"],
+  gdelt: ["company", "topic"],
+  tickertick: ["company"],
+  "hacker-news": ["company", "topic"],
+  "yahoo-search": ["company", "topic"],
+  "sec-fulltext": ["company", "topic", "filing"],
+  "federal-register": ["company", "topic"],
+  courtlistener: ["company", "topic"],
+  nasdaq: ["company"],
+  "seeking-alpha": ["company"],
+};
+
+type CompanySubjectRequirement = "ticker" | "ticker-or-cik" | "name-or-ticker" | "name";
+
+const COMPANY_SUBJECT_REQUIREMENTS: Partial<Record<NewsProvider, CompanySubjectRequirement>> = {
+  "yahoo-finance": "ticker",
+  finviz: "ticker",
+  tickertick: "ticker",
+  nasdaq: "ticker",
+  "seeking-alpha": "ticker",
+  "sec-edgar": "ticker-or-cik",
+  "federal-register": "name",
+  courtlistener: "name",
+};
 
 export async function buildCompanyNewsFeed(query: CompanyNewsQuery): Promise<NewsItem[]> {
   const result = await buildCompanyNewsFeedResult(query);
@@ -168,10 +212,8 @@ export async function* createWatchlistNewsWatcher(
 }
 
 export function providerCapabilities(provider: NewsProvider): readonly NewsProviderCapability[] {
-  if (provider === "yahoo-finance") return ["company"];
-  if (provider === "google-news") return ["company", "topic"];
-  if (provider === "sec-edgar") return ["company", "filing"];
-  return ["company"];
+  if (isFixedFeedProvider(provider)) return ["company", "topic"];
+  return QUERY_PROVIDER_CAPABILITIES[provider] ?? ["company"];
 }
 
 async function* watchItems(
@@ -304,6 +346,31 @@ async function fetchSource(
     };
     return fetchSecFilings(identifier, secOptions);
   }
+  if (provider === "bing-news") return fetchBingNews(googleQueryFromSubject(subject), options);
+  if (provider === "gdelt") return fetchGdeltNews(gdeltQueryFromSubject(subject), options);
+  if (provider === "tickertick")
+    return fetchTickerTickNews(requiredTicker(provider, subject), options);
+  if (provider === "hacker-news")
+    return fetchHackerNewsStories(plainQueryFromSubject(subject), options);
+  if (provider === "yahoo-search")
+    return fetchYahooSearchNews(yahooSearchQueryFromSubject(subject), options);
+  if (provider === "sec-fulltext") {
+    const fullTextOptions = {
+      ...options,
+      ...(query.secForms?.length ? { forms: query.secForms } : {}),
+      ...(subject.ticker ? { ticker: subject.ticker } : {}),
+    };
+    return fetchSecFullTextFilings(plainQueryFromSubject(subject), fullTextOptions);
+  }
+  if (provider === "federal-register")
+    return fetchFederalRegisterNews(requiredCompanyNameOrTopic(provider, subject), options);
+  if (provider === "courtlistener")
+    return fetchCourtListenerNews(requiredCompanyNameOrTopic(provider, subject), options);
+  if (provider === "nasdaq") return fetchNasdaqNews(requiredTicker(provider, subject), options);
+  if (provider === "seeking-alpha")
+    return fetchSeekingAlphaNews(requiredTicker(provider, subject), options);
+  if (isFixedFeedProvider(provider))
+    return fetchFixedFeedNews(provider, subjectMatchTerms(subject), options);
   return fetchFinvizNews(requiredTicker(provider, subject), options);
 }
 
@@ -313,6 +380,9 @@ function providerRequestUrls(
   query: NewsFeedOptions,
 ): readonly string[] {
   if (unsupportedReason(provider, subject)) return [];
+  const options = hasDateWindowBounds(normalizeDateWindow(query))
+    ? newsFeedOptionsWithoutLimit(query)
+    : query;
   if (provider === "yahoo-finance") return [yahooFinanceRssUrl(requiredTicker(provider, subject))];
   if (provider === "google-news") return [googleNewsRssUrl(googleQueryFromSubject(subject))];
   if (provider === "sec-edgar") {
@@ -321,6 +391,29 @@ function providerRequestUrls(
       ? query.secForms.map((form) => secCompanyAtomUrl(identifier, form))
       : [secCompanyAtomUrl(identifier)];
   }
+  if (provider === "bing-news") return [bingNewsRssUrl(googleQueryFromSubject(subject))];
+  if (provider === "gdelt") return [gdeltDocUrl(gdeltQueryFromSubject(subject), options)];
+  if (provider === "tickertick")
+    return [tickerTickFeedUrl(requiredTicker(provider, subject), options.limit)];
+  if (provider === "hacker-news")
+    return [hackerNewsSearchUrl(plainQueryFromSubject(subject), options.limit)];
+  if (provider === "yahoo-search")
+    return [yahooSearchUrl(yahooSearchQueryFromSubject(subject), options.limit)];
+  if (provider === "sec-fulltext") {
+    return [
+      secFullTextSearchUrl(plainQueryFromSubject(subject), {
+        ...options,
+        ...(query.secForms?.length ? { forms: query.secForms } : {}),
+      }),
+    ];
+  }
+  if (provider === "federal-register")
+    return [federalRegisterSearchUrl(requiredCompanyNameOrTopic(provider, subject), options)];
+  if (provider === "courtlistener")
+    return [courtListenerSearchUrl(requiredCompanyNameOrTopic(provider, subject), options)];
+  if (provider === "nasdaq") return [nasdaqRssUrl(requiredTicker(provider, subject))];
+  if (provider === "seeking-alpha") return [seekingAlphaRssUrl(requiredTicker(provider, subject))];
+  if (isFixedFeedProvider(provider)) return FIXED_FEEDS[provider].urls;
   return [finvizQuoteUrl(requiredTicker(provider, subject))];
 }
 
@@ -393,20 +486,23 @@ function sourcesForSubject(
 
 function unsupportedReason(provider: NewsProvider, subject: NewsSubject): string | undefined {
   if (subject.kind === "topic") {
-    return provider === "google-news" ? undefined : `${provider}: topic subjects are unsupported`;
+    return providerCapabilities(provider).includes("topic")
+      ? undefined
+      : `${provider}: topic subjects are unsupported`;
   }
 
-  if (provider === "yahoo-finance" && !subject.ticker) {
-    return "yahoo-finance: company ticker is required";
+  const requirement = COMPANY_SUBJECT_REQUIREMENTS[provider] ?? "name-or-ticker";
+  if (requirement === "ticker" && !subject.ticker) {
+    return `${provider}: company ticker is required`;
   }
-  if (provider === "finviz" && !subject.ticker) {
-    return "finviz: company ticker is required";
+  if (requirement === "ticker-or-cik" && !subject.cik && !subject.ticker) {
+    return `${provider}: company ticker or CIK is required`;
   }
-  if (provider === "sec-edgar" && !subject.cik && !subject.ticker) {
-    return "sec-edgar: company ticker or CIK is required";
+  if (requirement === "name-or-ticker" && !subject.companyName && !subject.ticker) {
+    return `${provider}: companyName or ticker is required`;
   }
-  if (provider === "google-news" && !subject.companyName && !subject.ticker) {
-    return "google-news: companyName or ticker is required";
+  if (requirement === "name" && !subject.companyName) {
+    return `${provider}: companyName is required`;
   }
   return undefined;
 }
@@ -415,6 +511,38 @@ function googleQueryFromSubject(subject: NewsSubject): string {
   if (subject.kind === "topic") return subject.query ?? subject.displayName;
   if (subject.companyName && subject.ticker) return `"${subject.companyName}" ${subject.ticker}`;
   return subject.companyName ?? subject.ticker ?? subject.displayName;
+}
+
+function gdeltQueryFromSubject(subject: NewsSubject): string {
+  if (subject.kind === "topic") return subject.query ?? subject.displayName;
+  if (subject.companyName) return `"${subject.companyName.replace(/"/g, "")}"`;
+  return subject.ticker ?? subject.displayName;
+}
+
+function plainQueryFromSubject(subject: NewsSubject): string {
+  if (subject.kind === "topic") return subject.query ?? subject.displayName;
+  return subject.companyName ?? subject.ticker ?? subject.displayName;
+}
+
+function yahooSearchQueryFromSubject(subject: NewsSubject): string {
+  if (subject.kind === "topic") return subject.query ?? subject.displayName;
+  return subject.ticker ?? subject.companyName ?? subject.displayName;
+}
+
+function requiredCompanyNameOrTopic(provider: NewsProvider, subject: NewsSubject): string {
+  if (subject.kind === "topic") return subject.query ?? subject.displayName;
+  if (!subject.companyName) throw new Error(`${provider}: companyName is required`);
+  return subject.companyName;
+}
+
+function subjectMatchTerms(subject: NewsSubject): SubjectMatchTerms {
+  if (subject.kind === "topic") {
+    return { query: subject.query ?? subject.displayName };
+  }
+  return {
+    ...(subject.ticker ? { ticker: subject.ticker } : {}),
+    ...(subject.companyName ? { companyName: subject.companyName } : {}),
+  };
 }
 
 function requiredTicker(provider: NewsProvider, subject: NewsSubject): string {

@@ -74,7 +74,17 @@ export function classifyMarketEvent(item: NewsItem): MarketEventClassification {
   }
 
   if (
-    containsAny(text, ["regulatory", "regulator", "sec ", "federal reserve", "fdic", "doj", "ftc"])
+    containsAny(text, [
+      "regulatory",
+      "regulator",
+      "sec ",
+      "federal reserve",
+      "federal register",
+      "federalregister",
+      "fdic",
+      "doj",
+      "ftc",
+    ])
   ) {
     tags.add("regulatory");
     setEventKind("regulatory");

@@ -54,7 +54,67 @@ const topicResult = await buildNewsFeedResult({
 });
 ```
 
-Topic feeds default to Google News only in this version. If unsupported providers are explicitly requested for a topic subject, those providers are not fetched and their `ProviderResult.status` is `"unsupported"` with a warning such as `"finviz: topic subjects are unsupported"`.
+Topic feeds default to Google News only in this version. Pass `sources` to fan a topic out to any topic-capable provider from the catalog below. If unsupported providers are explicitly requested for a topic subject, those providers are not fetched and their `ProviderResult.status` is `"unsupported"` with a warning such as `"finviz: topic subjects are unsupported"`.
+
+## Source catalog
+
+Company feeds default to `sec-edgar`, `yahoo-finance`, `google-news`, and `finviz`; topic feeds default to `google-news`. Every other provider is opt-in through `sources`. All providers are free, keyless, and public.
+
+### Query providers
+
+These providers query their upstream endpoint per subject.
+
+| Provider           | Capabilities           | Company subject needs | Endpoint                                          |
+| ------------------ | ---------------------- | --------------------- | ------------------------------------------------- |
+| `yahoo-finance`    | company                | ticker                | Yahoo Finance per-symbol RSS                      |
+| `google-news`      | company, topic         | companyName or ticker | Google News search RSS                            |
+| `sec-edgar`        | company, filing        | ticker or CIK         | SEC EDGAR company Atom (`secForms` supported)     |
+| `finviz`           | company                | ticker                | Finviz quote-page news table                      |
+| `bing-news`        | company, topic         | companyName or ticker | Bing News search RSS (redirect links unwrapped)   |
+| `gdelt`            | company, topic         | companyName or ticker | GDELT DOC 2.0 API (~1 request / 5 s per IP)       |
+| `tickertick`       | company                | ticker                | TickerTick API (10 requests / minute per IP)      |
+| `hacker-news`      | company, topic         | companyName or ticker | Algolia Hacker News search API                    |
+| `yahoo-search`     | company, topic         | companyName or ticker | Yahoo Finance search API (JSON)                   |
+| `sec-fulltext`     | company, topic, filing | companyName or ticker | SEC EDGAR full-text search (`secForms` supported) |
+| `federal-register` | company, topic         | companyName           | Federal Register documents API                    |
+| `courtlistener`    | company, topic         | companyName           | CourtListener opinion search feed                 |
+| `nasdaq`           | company                | ticker                | Nasdaq per-symbol RSS                             |
+| `seeking-alpha`    | company                | ticker                | Seeking Alpha per-symbol RSS                      |
+
+`since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`) and always enforced locally after fetching.
+
+### Fixed market and business feeds
+
+These providers fetch whole public feeds and filter items locally against the subject: topic queries require every query token; company subjects match the company name as a phrase or the ticker as a standalone uppercase token (`RGA`, `$RGA`, `NYSE:RGA`). Single-letter tickers only match with cashtag or exchange context. An `"empty"` status usually means the current headlines simply do not mention the subject.
+
+| Provider          | Feed                                                                  |
+| ----------------- | --------------------------------------------------------------------- |
+| `marketwatch`     | MarketWatch top stories, real-time headlines, market pulse, bulletins |
+| `wsj`             | The Wall Street Journal markets and US business                       |
+| `cnbc`            | CNBC top news, investing, earnings                                    |
+| `pr-newswire`     | PR Newswire all news releases                                         |
+| `globenewswire`   | GlobeNewswire public-company releases                                 |
+| `federal-reserve` | Federal Reserve press releases                                        |
+| `sec-press`       | SEC newsroom press releases                                           |
+| `coindesk`        | CoinDesk                                                              |
+| `cointelegraph`   | Cointelegraph                                                         |
+| `benzinga`        | Benzinga                                                              |
+| `investing-com`   | Investing.com stock market news                                       |
+| `upi`             | UPI business news                                                     |
+| `oilprice`        | OilPrice.com                                                          |
+| `nyt`             | The New York Times business, economy, DealBook                        |
+| `bbc`             | BBC News business                                                     |
+| `npr`             | NPR business                                                          |
+| `guardian`        | The Guardian business                                                 |
+| `ft`              | Financial Times headlines                                             |
+| `economist`       | The Economist finance & economics, business                           |
+| `fortune`         | Fortune                                                               |
+| `forbes`          | Forbes business                                                       |
+| `washington-post` | The Washington Post business                                          |
+
+The full registry, including exact feed URLs, is exported as `FIXED_FEEDS`; membership can be checked with `isFixedFeedProvider`. Sources excluded on purpose: endpoints requiring paid plans or registered API keys (NewsAPI, Finnhub, Marketaux, Guardian/NYT developer APIs, Benzinga API), dead or stub feeds (Business Wire public RSS, CNN Money, Motley Fool foolwatch), and endpoints that block non-browser clients (OTC Markets, AccessWire, Newsfile, Investegate, Barron's).
+
+Run `bun run smoke:sources` to check every provider against the live endpoints.
 
 ## General subject API
 
@@ -129,6 +189,6 @@ The package keeps a default SEC user agent for compatibility, but production cal
 
 ## Source limitations
 
-Yahoo Finance, Google News, and Finviz are public web/RSS sources whose terms, availability, markup, feeds, URLs, and throttling behavior can change without notice. SEC EDGAR responses can vary by identifier, form, count, and user-agent policy.
+All providers are public web feeds and endpoints whose terms, availability, markup, URLs, and throttling behavior can change without notice. SEC EDGAR responses can vary by identifier, form, count, and user-agent policy. GDELT and TickerTick enforce per-IP rate limits; shared egress IPs can see `429` responses that surface as provider errors while other providers keep working.
 
 Inspect `ProviderResult.status`, `warnings`, `requestUrls`, `fetchedAt`, `durationMs`, and `partial` before trusting a feed as complete. A successful package call can still be partial when one provider fails or is unsupported.
