@@ -11,6 +11,7 @@ import {
   parseGdeltNews,
   parseHackerNewsStories,
   parseNasdaqNews,
+  parseSecCurrentFilings,
   parseSecFullTextFilings,
   parseSeekingAlphaNews,
   parseTickerTickNews,
@@ -27,6 +28,7 @@ import {
   hackerNewsJsonFixture,
   marketFeedRssFixture,
   nasdaqRssFixture,
+  secCurrentAtomFixture,
   secFullTextJsonFixture,
   seekingAlphaRssFixture,
   tickerTickJsonFixture,
@@ -379,4 +381,93 @@ test("date windows propagate into query provider request urls", async () => {
   const secFullText = result.providers.find((provider) => provider.provider === "sec-fulltext");
   expect(secFullText?.status).toBe("ok");
   expect(secFullText?.items[0]?.publishedAt).toBe("2026-06-22T00:00:00.000Z");
+});
+
+test("parses SEC latest-filings entries with form types and urn accessions", () => {
+  const items = parseSecCurrentFilings(secCurrentAtomFixture, { ticker: "rga" });
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    provider: "sec-current",
+    kind: "filing",
+    title: "8-K - Reinsurance Group of America, Incorporated (0000898174) (Filer)",
+    url: "https://www.sec.gov/Archives/edgar/data/898174/000089817426000042/0000898174-26-000042-index.htm",
+    source: "SEC EDGAR",
+    ticker: "RGA",
+    formType: "8-K",
+    accessionNumber: "0000898174-26-000042",
+    publishedAt: "2026-07-14T21:30:29.000Z",
+  });
+  expect(items[1]?.formType).toBe("4");
+});
+
+test("sec-current topic filtering keeps boundary-safe token matches only", () => {
+  const items = parseSecCurrentFilings(secCurrentAtomFixture, {
+    filterQuery: "insurance holdings",
+  });
+
+  expect(items.map((item) => item.title)).toEqual([
+    "4 - Insurance Holdings Corp (0001234567) (Issuer)",
+  ]);
+});
+
+test("sec-current company subjects search EDGAR by company name per form", async () => {
+  const fetchedUrls: string[] = [];
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    companyName: "Reinsurance Group of America",
+    sources: ["sec-current"],
+    secForms: ["8-K", "4"],
+    fetch: async (input) => {
+      fetchedUrls.push(fetchInputUrl(input));
+      return new Response(secCurrentAtomFixture);
+    },
+  });
+
+  expect(fetchedUrls).toHaveLength(2);
+  for (const url of fetchedUrls) {
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe("https://www.sec.gov");
+    expect(parsed.searchParams.get("action")).toBe("getcurrent");
+    expect(parsed.searchParams.get("company")).toBe("Reinsurance Group of America");
+    expect(parsed.searchParams.get("output")).toBe("atom");
+  }
+  expect(fetchedUrls.map((url) => new URL(url).searchParams.get("type"))).toEqual(["8-K", "4"]);
+  expect(providerCapabilities("sec-current")).toEqual(["company", "topic", "filing"]);
+
+  const provider = result.providers[0];
+  expect(provider?.status).toBe("ok");
+  expect(provider?.requestUrls).toEqual(fetchedUrls);
+  expect(provider?.items.every((item) => item.ticker === "RGA")).toBe(true);
+
+  const nameless = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    sources: ["sec-current"],
+    fetch: async () => {
+      throw new Error("should not fetch");
+    },
+  });
+  expect(nameless.providers[0]?.status).toBe("unsupported");
+  expect(nameless.warnings).toEqual(["sec-current: companyName is required"]);
+});
+
+test("sec-current topic subjects stream the market-wide feed and filter locally", async () => {
+  const fetchedUrls: string[] = [];
+  const result = await buildTopicNewsFeedResult({
+    query: "insurance holdings",
+    sources: ["sec-current"],
+    fetch: async (input) => {
+      fetchedUrls.push(fetchInputUrl(input));
+      return new Response(secCurrentAtomFixture);
+    },
+  });
+
+  expect(fetchedUrls).toHaveLength(1);
+  const parsed = new URL(fetchedUrls[0] ?? "");
+  expect(parsed.searchParams.get("action")).toBe("getcurrent");
+  expect(parsed.searchParams.get("company")).toBeNull();
+  expect(result.providers[0]?.status).toBe("ok");
+  expect(result.items.map((item) => item.title)).toEqual([
+    "4 - Insurance Holdings Corp (0001234567) (Issuer)",
+  ]);
 });

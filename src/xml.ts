@@ -69,7 +69,9 @@ export function parseAtomEntries(xml: string, options: AtomParseOptions): NewsIt
 
     const updated = cleanText(readTag(block, "updated")) || cleanText(readTag(block, "published"));
     const summary = cleanText(readTag(block, "summary"));
-    const accessionNumber = cleanText(readTag(block, "accession-number"));
+    const accessionNumber =
+      cleanText(readTag(block, "accession-number")) ||
+      (cleanText(readTag(block, "id")).match(/accession-number=([\d-]+)/)?.[1] ?? "");
     const formType = cleanText(readTag(block, "filing-type")) || readCategoryTerm(block);
     const publishedAt = toIsoDate(updated);
     const decodedLink = decodeEntities(link);

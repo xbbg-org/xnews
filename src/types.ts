@@ -9,6 +9,7 @@ export type NewsProvider =
   | "hacker-news"
   | "yahoo-search"
   | "sec-fulltext"
+  | "sec-current"
   | "federal-register"
   | "courtlistener"
   | "nasdaq"

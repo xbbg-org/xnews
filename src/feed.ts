@@ -11,6 +11,7 @@ import { fetchHackerNewsStories, hackerNewsSearchUrl } from "./sources/hackernew
 import type { SubjectMatchTerms } from "./sources/match";
 import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq";
 import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec";
+import { fetchSecCurrentFilings, secCurrentAtomUrl } from "./sources/seccurrent";
 import { fetchSecFullTextFilings, secFullTextSearchUrl } from "./sources/secfulltext";
 import { fetchSeekingAlphaNews, seekingAlphaRssUrl } from "./sources/seekingalpha";
 import { fetchTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick";
@@ -60,6 +61,7 @@ const QUERY_PROVIDER_CAPABILITIES: Partial<
   "hacker-news": ["company", "topic"],
   "yahoo-search": ["company", "topic"],
   "sec-fulltext": ["company", "topic", "filing"],
+  "sec-current": ["company", "topic", "filing"],
   "federal-register": ["company", "topic"],
   courtlistener: ["company", "topic"],
   nasdaq: ["company"],
@@ -75,6 +77,7 @@ const COMPANY_SUBJECT_REQUIREMENTS: Partial<Record<NewsProvider, CompanySubjectR
   nasdaq: "ticker",
   "seeking-alpha": "ticker",
   "sec-edgar": "ticker-or-cik",
+  "sec-current": "name",
   "federal-register": "name",
   courtlistener: "name",
 };
@@ -362,6 +365,17 @@ async function fetchSource(
     };
     return fetchSecFullTextFilings(plainQueryFromSubject(subject), fullTextOptions);
   }
+  if (provider === "sec-current") {
+    const company =
+      subject.kind === "company" ? requiredCompanyNameOrTopic(provider, subject) : undefined;
+    const currentOptions = {
+      ...options,
+      ...(query.secForms?.length ? { forms: query.secForms } : {}),
+      ...(subject.ticker ? { ticker: subject.ticker } : {}),
+      ...(subject.kind === "topic" ? { filterQuery: subject.query ?? subject.displayName } : {}),
+    };
+    return fetchSecCurrentFilings(company, currentOptions);
+  }
   if (provider === "federal-register")
     return fetchFederalRegisterNews(requiredCompanyNameOrTopic(provider, subject), options);
   if (provider === "courtlistener")
@@ -406,6 +420,14 @@ function providerRequestUrls(
         ...(query.secForms?.length ? { forms: query.secForms } : {}),
       }),
     ];
+  }
+  if (provider === "sec-current") {
+    const company =
+      subject.kind === "company" ? requiredCompanyNameOrTopic(provider, subject) : undefined;
+    const count = options.limit ?? 40;
+    return query.secForms?.length
+      ? query.secForms.map((form) => secCurrentAtomUrl(company, form, count))
+      : [secCurrentAtomUrl(company, undefined, count)];
   }
   if (provider === "federal-register")
     return [federalRegisterSearchUrl(requiredCompanyNameOrTopic(provider, subject), options)];

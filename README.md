@@ -64,22 +64,23 @@ Company feeds default to `sec-edgar`, `yahoo-finance`, `google-news`, and `finvi
 
 These providers query their upstream endpoint per subject.
 
-| Provider           | Capabilities           | Company subject needs | Endpoint                                          |
-| ------------------ | ---------------------- | --------------------- | ------------------------------------------------- |
-| `yahoo-finance`    | company                | ticker                | Yahoo Finance per-symbol RSS                      |
-| `google-news`      | company, topic         | companyName or ticker | Google News search RSS                            |
-| `sec-edgar`        | company, filing        | ticker or CIK         | SEC EDGAR company Atom (`secForms` supported)     |
-| `finviz`           | company                | ticker                | Finviz quote-page news table                      |
-| `bing-news`        | company, topic         | companyName or ticker | Bing News search RSS (redirect links unwrapped)   |
-| `gdelt`            | company, topic         | companyName or ticker | GDELT DOC 2.0 API (~1 request / 5 s per IP)       |
-| `tickertick`       | company                | ticker                | TickerTick API (10 requests / minute per IP)      |
-| `hacker-news`      | company, topic         | companyName or ticker | Algolia Hacker News search API                    |
-| `yahoo-search`     | company, topic         | companyName or ticker | Yahoo Finance search API (JSON)                   |
-| `sec-fulltext`     | company, topic, filing | companyName or ticker | SEC EDGAR full-text search (`secForms` supported) |
-| `federal-register` | company, topic         | companyName           | Federal Register documents API                    |
-| `courtlistener`    | company, topic         | companyName           | CourtListener opinion search feed                 |
-| `nasdaq`           | company                | ticker                | Nasdaq per-symbol RSS                             |
-| `seeking-alpha`    | company                | ticker                | Seeking Alpha per-symbol RSS                      |
+| Provider           | Capabilities           | Company subject needs | Endpoint                                                                                                                                        |
+| ------------------ | ---------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `yahoo-finance`    | company                | ticker                | Yahoo Finance per-symbol RSS                                                                                                                    |
+| `google-news`      | company, topic         | companyName or ticker | Google News search RSS                                                                                                                          |
+| `sec-edgar`        | company, filing        | ticker or CIK         | SEC EDGAR company Atom (`secForms` supported)                                                                                                   |
+| `finviz`           | company                | ticker                | Finviz quote-page news table                                                                                                                    |
+| `bing-news`        | company, topic         | companyName or ticker | Bing News search RSS (redirect links unwrapped)                                                                                                 |
+| `gdelt`            | company, topic         | companyName or ticker | GDELT DOC 2.0 API (~1 request / 5 s per IP)                                                                                                     |
+| `tickertick`       | company                | ticker                | TickerTick API (10 requests / minute per IP)                                                                                                    |
+| `hacker-news`      | company, topic         | companyName or ticker | Algolia Hacker News search API                                                                                                                  |
+| `yahoo-search`     | company, topic         | companyName or ticker | Yahoo Finance search API (JSON)                                                                                                                 |
+| `sec-fulltext`     | company, topic, filing | companyName or ticker | SEC EDGAR full-text search (`secForms` supported)                                                                                               |
+| `sec-current`      | company, topic, filing | companyName           | SEC EDGAR latest-filings stream (`secForms` supported; company uses EDGAR's name search over current filings, topics filter the stream locally) |
+| `federal-register` | company, topic         | companyName           | Federal Register documents API                                                                                                                  |
+| `courtlistener`    | company, topic         | companyName           | CourtListener opinion search feed                                                                                                               |
+| `nasdaq`           | company                | ticker                | Nasdaq per-symbol RSS                                                                                                                           |
+| `seeking-alpha`    | company                | ticker                | Seeking Alpha per-symbol RSS                                                                                                                    |
 
 `since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`) and always enforced locally after fetching.
 

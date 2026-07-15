@@ -76,6 +76,11 @@ export type { SubjectMatchItem, SubjectMatchTerms } from "./sources/match";
 export { fetchNasdaqNews, nasdaqRssUrl, parseNasdaqNews } from "./sources/nasdaq";
 export { fetchSecFilings, parseSecFilings, secCompanyAtomUrl } from "./sources/sec";
 export {
+  fetchSecCurrentFilings,
+  parseSecCurrentFilings,
+  secCurrentAtomUrl,
+} from "./sources/seccurrent";
+export {
   fetchSecFullTextFilings,
   parseSecFullTextFilings,
   secFullTextSearchUrl,

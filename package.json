@@ -1,7 +1,7 @@
 {
   "name": "@xbbg/xnews",
   "version": "0.1.0",
-  "description": "Build market news feeds from free public sources: Yahoo Finance, Google News, Bing News, SEC EDGAR (filings, full-text search, and press releases), Finviz, Nasdaq, Seeking Alpha, TickerTick, GDELT, Hacker News, Federal Register, CourtListener, and major market, wire, and business feeds.",
+  "description": "Build market news feeds from free public sources: Yahoo Finance, Google News, Bing News, SEC EDGAR (company filings, the latest-filings stream, full-text search, and press releases), Finviz, Nasdaq, Seeking Alpha, TickerTick, GDELT, Hacker News, Federal Register, CourtListener, and major market, wire, and business feeds.",
   "files": [
     "dist"
   ],

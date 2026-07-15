@@ -242,3 +242,23 @@ export const marketFeedRssFixture = `<?xml version="1.0" encoding="UTF-8"?><rss 
 </channel></rss>`;
 
 export const emptyRssFixture = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>empty</title></channel></rss>`;
+
+export const secCurrentAtomFixture = `<?xml version="1.0" encoding="ISO-8859-1" ?><feed xmlns="http://www.w3.org/2005/Atom">
+<title>Latest Filings - Tue, 14 Jul 2026 20:42:30 EDT</title>
+<entry>
+<title>8-K - Reinsurance Group of America, Incorporated (0000898174) (Filer)</title>
+<link rel="alternate" type="text/html" href="https://www.sec.gov/Archives/edgar/data/898174/000089817426000042/0000898174-26-000042-index.htm"/>
+<summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2026-07-14 &lt;b&gt;AccNo:&lt;/b&gt; 0000898174-26-000042 &lt;b&gt;Size:&lt;/b&gt; 155 KB</summary>
+<updated>2026-07-14T17:30:29-04:00</updated>
+<category scheme="https://www.sec.gov/" label="form type" term="8-K"/>
+<id>urn:tag:sec.gov,2008:accession-number=0000898174-26-000042</id>
+</entry>
+<entry>
+<title>4 - Insurance Holdings Corp (0001234567) (Issuer)</title>
+<link rel="alternate" type="text/html" href="https://www.sec.gov/Archives/edgar/data/1234567/000123456726000010/0001234567-26-000010-index.htm"/>
+<summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2026-07-14 &lt;b&gt;AccNo:&lt;/b&gt; 0001234567-26-000010 &lt;b&gt;Size:&lt;/b&gt; 5 KB</summary>
+<updated>2026-07-14T16:00:00-04:00</updated>
+<category scheme="https://www.sec.gov/" label="form type" term="4"/>
+<id>urn:tag:sec.gov,2008:accession-number=0001234567-26-000010</id>
+</entry>
+</feed>`;
