@@ -36,7 +36,8 @@ export type NewsProvider =
   | "economist"
   | "fortune"
   | "forbes"
-  | "washington-post";
+  | "washington-post"
+  | "youtube";
 
 export type NewsProviderCapability = "company" | "topic" | "filing";
 
@@ -60,7 +61,7 @@ export type MarketEventKind =
   | "market"
   | "unknown";
 
-export type NewsKind = "article" | "filing" | "press-release" | "analysis" | "unknown";
+export type NewsKind = "article" | "filing" | "press-release" | "analysis" | "video" | "unknown";
 
 export interface CompanyNewsSubjectInput {
   readonly kind: "company";

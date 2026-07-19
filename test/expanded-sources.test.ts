@@ -2,8 +2,13 @@ import { expect, test } from "bun:test";
 import {
   buildCompanyNewsFeedResult,
   buildTopicNewsFeedResult,
+  extractYoutubeVideoId,
+  fetchYoutubeChannelVideos,
+  fetchYoutubeSubscriptions,
+  fetchYoutubeTranscript,
   FIXED_FEED_PROVIDERS,
   FIXED_FEEDS,
+  isYoutubeChannelId,
   msrbEmmaPeriods,
   parseBingNews,
   parseCourtListenerNews,
@@ -18,9 +23,16 @@ import {
   parseSeekingAlphaNews,
   parseTickerTickNews,
   parseYahooSearchNews,
+  parseYoutubeCaptionTracks,
+  parseYoutubeChannelVideos,
+  parseYoutubeTranscriptSegments,
+  pickYoutubeCaptionTrack,
   providerCapabilities,
+  resolveYoutubeChannelId,
   secFullTextSearchUrl,
   subjectMatcher,
+  youtubeChannelFeedUrl,
+  youtubeWatchUrl,
 } from "../src";
 import {
   bingRssFixture,
@@ -39,6 +51,14 @@ import {
   seekingAlphaRssFixture,
   tickerTickJsonFixture,
   yahooSearchJsonFixture,
+  youtubeAtomFixture,
+  youtubeChannelPageFixture,
+  youtubeMacroAtomFixture,
+  youtubePlayerNoCaptionsFixture,
+  youtubePlayerResponseFixture,
+  youtubeSrv3TranscriptFixture,
+  youtubeTranscriptXmlFixture,
+  youtubeWatchPageFixture,
 } from "./fixtures";
 
 function fetchInputUrl(input: RequestInfo | URL): string {
@@ -613,4 +633,302 @@ test("msrb-emma company subjects match issuer names and require a name", async (
   });
   expect(nameless.providers[0]?.status).toBe("unsupported");
   expect(nameless.warnings).toEqual(["msrb-emma: companyName is required"]);
+});
+
+test("builds YouTube channel feed URLs with a Shorts-free playlist variant", () => {
+  expect(youtubeChannelFeedUrl("UCmktminuteaaaaaaaaaaaaa")).toBe(
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCmktminuteaaaaaaaaaaaaa",
+  );
+  expect(youtubeChannelFeedUrl("UCmktminuteaaaaaaaaaaaaa", { hideShorts: true })).toBe(
+    "https://www.youtube.com/feeds/videos.xml?playlist_id=UULFmktminuteaaaaaaaaaaaaa",
+  );
+  expect(isYoutubeChannelId("UCmktminuteaaaaaaaaaaaaa")).toBe(true);
+  expect(isYoutubeChannelId("@MarketMinute")).toBe(false);
+});
+
+test("parses YouTube channel Atom feeds into video items", () => {
+  const items = parseYoutubeChannelVideos(youtubeAtomFixture);
+
+  expect(items).toHaveLength(2);
+  expect(items[0]).toMatchObject({
+    id: "youtube|fedCut2026A|Fed Cuts Rates & Markets Rally",
+    provider: "youtube",
+    kind: "video",
+    title: "Fed Cuts Rates & Markets Rally",
+    url: "https://www.youtube.com/watch?v=fedCut2026A",
+    canonicalUrl: "https://www.youtube.com/watch?v=fedCut2026A",
+    source: "Market Minute",
+    publishedAt: "2026-07-14T15:00:31.000Z",
+    publishedAtText: "2026-07-14T15:00:31+00:00",
+    summary: "Rate decision recap. Second line of notes.",
+  });
+  expect(items[1]?.publishedAt).toBe("2026-07-10T09:00:00.000Z");
+  expect(items[1]?.summary).toBeUndefined();
+  expect(parseYoutubeChannelVideos(youtubeAtomFixture, 1)).toHaveLength(1);
+});
+
+test("falls back to the videoId watch URL when an entry has no link tag", () => {
+  const items = parseYoutubeChannelVideos(youtubeMacroAtomFixture);
+
+  expect(items).toHaveLength(1);
+  expect(items[0]?.url).toBe("https://www.youtube.com/watch?v=macroWk26Cc");
+  expect(items[0]?.source).toBe("Macro Weekly");
+});
+
+async function rejectionMessage(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  throw new Error("expected promise to reject");
+}
+
+test("resolves YouTube channel references to canonical channel IDs", async () => {
+  expect(
+    await resolveYoutubeChannelId("UCmktminuteaaaaaaaaaaaaa", {
+      fetch: async () => {
+        throw new Error("should not fetch");
+      },
+    }),
+  ).toBe("UCmktminuteaaaaaaaaaaaaa");
+  expect(
+    await resolveYoutubeChannelId(
+      "https://www.youtube.com/channel/UCmktminuteaaaaaaaaaaaaa/videos",
+      {
+        fetch: async () => {
+          throw new Error("should not fetch");
+        },
+      },
+    ),
+  ).toBe("UCmktminuteaaaaaaaaaaaaa");
+
+  const fetchedUrls: string[] = [];
+  const pageFetch = async (input: RequestInfo | URL): Promise<Response> => {
+    fetchedUrls.push(fetchInputUrl(input));
+    return new Response(youtubeChannelPageFixture);
+  };
+  expect(await resolveYoutubeChannelId("@MarketMinute", { fetch: pageFetch })).toBe(
+    "UCMktabcdefghijklmnopqrs",
+  );
+  expect(await resolveYoutubeChannelId("MarketMinute", { fetch: pageFetch })).toBe(
+    "UCMktabcdefghijklmnopqrs",
+  );
+  expect(fetchedUrls).toEqual([
+    "https://www.youtube.com/@MarketMinute",
+    "https://www.youtube.com/@MarketMinute",
+  ]);
+
+  expect(
+    await rejectionMessage(
+      resolveYoutubeChannelId("@Nowhere", { fetch: async () => new Response("<html></html>") }),
+    ),
+  ).toMatch(/channel ID/);
+});
+
+test("fetches channel videos through the Shorts-free playlist when hideShorts is set", async () => {
+  const fetchedUrls: string[] = [];
+  const items = await fetchYoutubeChannelVideos("UCmktminuteaaaaaaaaaaaaa", {
+    hideShorts: true,
+    limit: 1,
+    fetch: async (input) => {
+      fetchedUrls.push(fetchInputUrl(input));
+      return new Response(youtubeAtomFixture);
+    },
+  });
+
+  expect(fetchedUrls).toEqual([
+    "https://www.youtube.com/feeds/videos.xml?playlist_id=UULFmktminuteaaaaaaaaaaaaa",
+  ]);
+  expect(items).toHaveLength(1);
+});
+
+test("applies date windows to YouTube channel fetches locally", async () => {
+  const items = await fetchYoutubeChannelVideos("UCmktminuteaaaaaaaaaaaaa", {
+    since: "2026-07-12T00:00:00.000Z",
+    fetch: async () => new Response(youtubeAtomFixture),
+  });
+
+  expect(items.map((item) => item.title)).toEqual(["Fed Cuts Rates & Markets Rally"]);
+});
+
+test("merges YouTube subscriptions newest-first and isolates per-channel failures", async () => {
+  const result = await fetchYoutubeSubscriptions(
+    [
+      "UCmktminuteaaaaaaaaaaaaa",
+      "UCmktminuteaaaaaaaaaaaaa",
+      "UCmacroweeklybbbbbbbbbbb",
+      "UCdeadchannelccccccccccc",
+    ],
+    {
+      fetch: async (input) => {
+        const href = fetchInputUrl(input);
+        if (href.includes("channel_id=UCmktminuteaaaaaaaaaaaaa")) {
+          return new Response(youtubeAtomFixture);
+        }
+        if (href.includes("channel_id=UCmacroweeklybbbbbbbbbbb")) {
+          return new Response(youtubeMacroAtomFixture);
+        }
+        return new Response("Not Found", { status: 404, statusText: "Not Found" });
+      },
+    },
+  );
+
+  expect(result.partial).toBe(true);
+  expect(result.channels).toHaveLength(4);
+  expect(result.channels[3]?.error).toMatch(/intermittently 404s/);
+  expect(result.items.map((item) => item.title)).toEqual([
+    "Fed Cuts Rates & Markets Rally",
+    "Macro Weekly: Payrolls Preview",
+    "CPI Print Reaction",
+  ]);
+  expect(result.channels[0]?.channelId).toBe("UCmktminuteaaaaaaaaaaaaa");
+});
+
+test("extracts YouTube video IDs from IDs and URL shapes", () => {
+  expect(extractYoutubeVideoId("fedCut2026A")).toBe("fedCut2026A");
+  expect(extractYoutubeVideoId("https://www.youtube.com/watch?v=fedCut2026A&t=42s")).toBe(
+    "fedCut2026A",
+  );
+  expect(extractYoutubeVideoId("https://youtu.be/fedCut2026A?si=xyz")).toBe("fedCut2026A");
+  expect(extractYoutubeVideoId("https://www.youtube.com/shorts/fedCut2026A")).toBe("fedCut2026A");
+  expect(extractYoutubeVideoId("https://www.youtube.com/embed/fedCut2026A")).toBe("fedCut2026A");
+  expect(extractYoutubeVideoId("m.youtube.com/watch?v=fedCut2026A")).toBe("fedCut2026A");
+  expect(extractYoutubeVideoId("https://example.com/watch?v=fedCut2026A")).toBeUndefined();
+  expect(extractYoutubeVideoId("not a video")).toBeUndefined();
+  expect(youtubeWatchUrl("fedCut2026A")).toBe("https://www.youtube.com/watch?v=fedCut2026A");
+});
+
+test("parses caption tracks and picks by language preference", () => {
+  const tracks = parseYoutubeCaptionTracks(youtubeWatchPageFixture);
+
+  expect(tracks).toHaveLength(3);
+  expect(tracks[0]).toEqual({
+    url: "https://www.youtube.com/api/timedtext?v=fedCut2026A&lang=en&kind=asr",
+    languageCode: "en",
+    name: "English (auto-generated)",
+    generated: true,
+  });
+  expect(tracks[2]).toMatchObject({ languageCode: "es", name: "Spanish", generated: false });
+
+  expect(pickYoutubeCaptionTrack(tracks, ["en"])?.languageCode).toBe("en");
+  expect(pickYoutubeCaptionTrack(tracks, ["en-GB"])?.languageCode).toBe("en-GB");
+  expect(pickYoutubeCaptionTrack(tracks, ["es", "en"])?.languageCode).toBe("es");
+  expect(pickYoutubeCaptionTrack(tracks, ["fr"])?.languageCode).toBe("en-GB");
+  expect(pickYoutubeCaptionTrack([], ["en"])).toBeUndefined();
+  expect(parseYoutubeCaptionTracks("<html>no captions</html>")).toEqual([]);
+});
+
+test("parses timedtext transcripts with double-encoded entities", () => {
+  const segments = parseYoutubeTranscriptSegments(youtubeTranscriptXmlFixture);
+
+  expect(segments).toHaveLength(3);
+  expect(segments[0]).toEqual({ text: "so the fed just cut rates", startMs: 80, durationMs: 2360 });
+  expect(segments[1]?.text).toBe("here's what it means for markets");
+  expect(segments[2]).toEqual({ text: "and that's the wrap", startMs: 8140, durationMs: 0 });
+});
+
+test("parses srv3 timedtext paragraphs with word fragments", () => {
+  const segments = parseYoutubeTranscriptSegments(youtubeSrv3TranscriptFixture);
+
+  expect(segments).toHaveLength(3);
+  expect(segments[0]).toEqual({
+    text: "so the fed just cut rates",
+    startMs: 80,
+    durationMs: 2360,
+  });
+  expect(segments[1]?.text).toBe("here's what it means");
+  expect(segments[2]).toEqual({ text: "plain text line", startMs: 8140, durationMs: 1000 });
+});
+
+test("fetches a full transcript through the player API caption tracks", async () => {
+  const fetchedUrls: string[] = [];
+  const fetchedInits: (RequestInit | undefined)[] = [];
+  const transcript = await fetchYoutubeTranscript("https://www.youtube.com/watch?v=fedCut2026A", {
+    languages: ["en-GB"],
+    fetch: async (input, init) => {
+      fetchedUrls.push(fetchInputUrl(input));
+      fetchedInits.push(init);
+      const href = fetchInputUrl(input);
+      if (href.includes("youtubei/v1/player")) return new Response(youtubePlayerResponseFixture);
+      if (href.includes("timedtext")) return new Response(youtubeSrv3TranscriptFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  expect(fetchedUrls).toEqual([
+    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+    "https://www.youtube.com/api/timedtext?v=fedCut2026A&caps=asr&lang=en-GB&fmt=srv3",
+  ]);
+  expect(fetchedInits[0]?.method).toBe("POST");
+  const playerRequestBody = fetchedInits[0]?.body;
+  expect(typeof playerRequestBody).toBe("string");
+  expect(playerRequestBody).toContain('"videoId":"fedCut2026A"');
+  expect(transcript).toMatchObject({
+    videoId: "fedCut2026A",
+    languageCode: "en-GB",
+    trackName: "English (United Kingdom)",
+    generated: false,
+  });
+  expect(transcript.segments).toHaveLength(3);
+  expect(transcript.text).toBe("so the fed just cut rates here's what it means plain text line");
+});
+
+test("falls back to watch-page caption tracks when the player API has none", async () => {
+  const fetchedUrls: string[] = [];
+  const transcript = await fetchYoutubeTranscript("fedCut2026A", {
+    languages: ["en-GB"],
+    fetch: async (input) => {
+      const href = fetchInputUrl(input);
+      fetchedUrls.push(href);
+      if (href.includes("youtubei/v1/player")) return new Response(youtubePlayerNoCaptionsFixture);
+      if (href.includes("/watch?v=fedCut2026A")) return new Response(youtubeWatchPageFixture);
+      if (href.includes("timedtext")) return new Response(youtubeTranscriptXmlFixture);
+      throw new Error(`Unexpected URL ${href}`);
+    },
+  });
+
+  expect(fetchedUrls).toEqual([
+    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+    "https://www.youtube.com/watch?v=fedCut2026A",
+    "https://www.youtube.com/api/timedtext?v=fedCut2026A&lang=en-GB",
+  ]);
+  expect(transcript.languageCode).toBe("en-GB");
+  expect(transcript.text).toBe(
+    "so the fed just cut rates here's what it means for markets and that's the wrap",
+  );
+
+  expect(
+    await rejectionMessage(
+      fetchYoutubeTranscript("fedCut2026A", { fetch: async () => new Response("<html></html>") }),
+    ),
+  ).toMatch(/No caption tracks/);
+
+  expect(
+    await rejectionMessage(
+      fetchYoutubeTranscript("fedCut2026A", {
+        fetch: async (input) => {
+          const href = fetchInputUrl(input);
+          if (href.includes("youtubei/v1/player")) {
+            return new Response(youtubePlayerResponseFixture);
+          }
+          return new Response("");
+        },
+      }),
+    ),
+  ).toMatch(/proof-of-origin/);
+});
+
+test("reports youtube as unsupported for subject-based feeds", async () => {
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "RGA",
+    sources: ["youtube"],
+    fetch: async () => {
+      throw new Error("should not fetch");
+    },
+  });
+
+  expect(result.providers[0]?.status).toBe("unsupported");
+  expect(result.providers[0]?.warnings[0]).toMatch(/fetchYoutubeSubscriptions/);
+  expect(providerCapabilities("youtube")).toEqual([]);
 });

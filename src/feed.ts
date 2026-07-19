@@ -68,6 +68,7 @@ const QUERY_PROVIDER_CAPABILITIES: Partial<
   "msrb-emma": ["company", "topic", "filing"],
   nasdaq: ["company"],
   "seeking-alpha": ["company"],
+  youtube: [],
 };
 
 type CompanySubjectRequirement = "ticker" | "ticker-or-cik" | "name-or-ticker" | "name";
@@ -515,6 +516,9 @@ function sourcesForSubject(
 }
 
 function unsupportedReason(provider: NewsProvider, subject: NewsSubject): string | undefined {
+  if (provider === "youtube") {
+    return "youtube: channel-feed provider without subject search; use fetchYoutubeSubscriptions or fetchYoutubeChannelVideos";
+  }
   if (subject.kind === "topic") {
     return providerCapabilities(provider).includes("topic")
       ? undefined

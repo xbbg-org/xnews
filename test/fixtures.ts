@@ -348,3 +348,127 @@ export const msrbEmmaJsonFixture = JSON.stringify({
     },
   ],
 });
+
+export const youtubeAtomFixture = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+<link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCmktminuteaaaaaaaaaaaaa"/>
+<id>yt:channel:mktminuteaaaaaaaaaaaaa</id>
+<title>Market Minute</title>
+<link rel="alternate" href="https://www.youtube.com/channel/UCmktminuteaaaaaaaaaaaaa"/>
+<entry>
+<id>yt:video:fedCut2026A</id>
+<yt:videoId>fedCut2026A</yt:videoId>
+<yt:channelId>UCmktminuteaaaaaaaaaaaaa</yt:channelId>
+<title>Fed Cuts Rates &amp; Markets Rally</title>
+<link rel="alternate" href="https://www.youtube.com/watch?v=fedCut2026A"/>
+<author><name>Market Minute</name><uri>https://www.youtube.com/channel/UCmktminuteaaaaaaaaaaaaa</uri></author>
+<published>2026-07-14T15:00:31+00:00</published>
+<updated>2026-07-14T18:30:07+00:00</updated>
+<media:group>
+<media:title>Fed Cuts Rates &amp; Markets Rally</media:title>
+<media:content url="https://www.youtube.com/v/fedCut2026A?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+<media:thumbnail url="https://i2.ytimg.com/vi/fedCut2026A/hqdefault.jpg" width="480" height="360"/>
+<media:description>Rate decision recap.
+Second line of notes.</media:description>
+<media:community>
+<media:starRating count="1234" average="5.00" min="1" max="5"/>
+<media:statistics views="98765"/>
+</media:community>
+</media:group>
+</entry>
+<entry>
+<id>yt:video:cpiPrint26B</id>
+<yt:videoId>cpiPrint26B</yt:videoId>
+<yt:channelId>UCmktminuteaaaaaaaaaaaaa</yt:channelId>
+<title>CPI Print Reaction</title>
+<link rel="alternate" href="https://www.youtube.com/watch?v=cpiPrint26B"/>
+<author><name>Market Minute</name><uri>https://www.youtube.com/channel/UCmktminuteaaaaaaaaaaaaa</uri></author>
+<published>2026-07-10T09:00:00+00:00</published>
+<updated>2026-07-10T09:05:00+00:00</updated>
+<media:group>
+<media:title>CPI Print Reaction</media:title>
+<media:thumbnail url="https://i2.ytimg.com/vi/cpiPrint26B/hqdefault.jpg" width="480" height="360"/>
+<media:community>
+<media:statistics views="4321"/>
+</media:community>
+</media:group>
+</entry>
+</feed>`;
+
+export const youtubeMacroAtomFixture = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+<title>Macro Weekly</title>
+<entry>
+<id>yt:video:macroWk26Cc</id>
+<yt:videoId>macroWk26Cc</yt:videoId>
+<yt:channelId>UCmacroweeklybbbbbbbbbbb</yt:channelId>
+<title>Macro Weekly: Payrolls Preview</title>
+<author><name>Macro Weekly</name><uri>https://www.youtube.com/channel/UCmacroweeklybbbbbbbbbbb</uri></author>
+<published>2026-07-12T12:00:00+00:00</published>
+<updated>2026-07-12T12:00:00+00:00</updated>
+<media:group>
+<media:title>Macro Weekly: Payrolls Preview</media:title>
+<media:description>What to watch in Friday's jobs report.</media:description>
+</media:group>
+</entry>
+</feed>`;
+
+export const youtubeChannelPageFixture = `<!DOCTYPE html><html><head>
+<link rel="canonical" href="https://www.youtube.com/channel/UCMktabcdefghijklmnopqrs">
+<meta property="og:url" content="https://www.youtube.com/channel/UCMktabcdefghijklmnopqrs">
+</head><body><script>var ytInitialData = {"metadata":{"channelMetadataRenderer":{"externalId":"UCMktabcdefghijklmnopqrs"}}};</script></body></html>`;
+
+export const youtubeWatchPageFixture = `<!DOCTYPE html><html><body><script>var ytInitialPlayerResponse = {"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=fedCut2026A\\u0026lang=en\\u0026kind=asr","name":{"simpleText":"English (auto-generated)"},"vssId":"a.en","languageCode":"en","kind":"asr","isTranslatable":true},{"baseUrl":"https://www.youtube.com/api/timedtext?v=fedCut2026A\\u0026lang=en-GB","name":{"simpleText":"English (United Kingdom)"},"vssId":".en-GB","languageCode":"en-GB","isTranslatable":true},{"baseUrl":"https://www.youtube.com/api/timedtext?v=fedCut2026A\\u0026lang=es","name":{"runs":[{"text":"Spanish"}]},"vssId":".es","languageCode":"es","isTranslatable":true}],"audioTracks":[{"captionTrackIndices":[0,1,2]}],"translationLanguages":[{"languageCode":"de","languageName":{"simpleText":"German"}}]}},"videoDetails":{"videoId":"fedCut2026A"}};</script></body></html>`;
+
+export const youtubeTranscriptXmlFixture = `<?xml version="1.0" encoding="utf-8" ?><transcript><text start="0.08" dur="2.36">so the fed just cut rates</text><text start="2.44" dur="3.2">here&amp;#39;s what it means for markets</text><text start="5.64" dur="2.5"> </text><text start="8.14">and that&amp;#39;s the wrap</text></transcript>`;
+
+export const youtubePlayerResponseFixture = JSON.stringify({
+  responseContext: { visitorData: "abc123" },
+  playabilityStatus: { status: "OK" },
+  captions: {
+    playerCaptionsTracklistRenderer: {
+      captionTracks: [
+        {
+          baseUrl:
+            "https://www.youtube.com/api/timedtext?v=fedCut2026A&caps=asr&lang=en&fmt=srv3&kind=asr",
+          name: { runs: [{ text: "English (auto-generated)" }] },
+          vssId: "a.en",
+          languageCode: "en",
+          kind: "asr",
+          isTranslatable: true,
+        },
+        {
+          baseUrl:
+            "https://www.youtube.com/api/timedtext?v=fedCut2026A&caps=asr&lang=en-GB&fmt=srv3",
+          name: { runs: [{ text: "English (United Kingdom)" }] },
+          vssId: ".en-GB",
+          languageCode: "en-GB",
+          isTranslatable: true,
+        },
+      ],
+      audioTracks: [{ captionTrackIndices: [0, 1] }],
+      translationLanguages: [{ languageCode: "de", languageName: { runs: [{ text: "German" }] } }],
+    },
+  },
+  videoDetails: { videoId: "fedCut2026A", title: "Fed Cuts Rates & Markets Rally" },
+});
+
+export const youtubePlayerNoCaptionsFixture = JSON.stringify({
+  playabilityStatus: { status: "OK" },
+  videoDetails: { videoId: "fedCut2026A" },
+});
+
+export const youtubeSrv3TranscriptFixture = `<?xml version="1.0" encoding="utf-8" ?><timedtext format="3">
+<head>
+<ws id="1" mh="2" ju="0" sd="3"/>
+<wp id="1" ap="4" ah="50" av="73" rc="2" cc="32"/>
+</head>
+<body>
+<w t="0" d="10000" id="1" wp="1" ws="1"/>
+<p t="80" d="2360" w="1"><s>so</s><s t="120"> the</s><s t="240"> fed</s><s t="400"> just</s><s t="560"> cut</s><s t="700"> rates</s></p>
+<p t="2440" d="3200" w="1"><s>here&#39;s</s><s t="200"> what</s><s t="400"> it</s><s t="500"> means</s></p>
+<p t="5640" d="2500" w="1">
+</p>
+<p t="8140" d="1000" w="1">plain text line</p>
+</body>
+</timedtext>`;

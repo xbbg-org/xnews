@@ -1,4 +1,10 @@
-import { buildNewsFeedResult, FIXED_FEED_PROVIDERS, providerCapabilities } from "../src";
+import {
+  buildNewsFeedResult,
+  FIXED_FEED_PROVIDERS,
+  fetchYoutubeSubscriptions,
+  fetchYoutubeTranscript,
+  providerCapabilities,
+} from "../src";
 import type { NewsProvider, ProviderResult } from "../src";
 
 const QUERY_PROVIDERS: readonly NewsProvider[] = [
@@ -61,6 +67,45 @@ if (failures.length > 0) {
   console.log(`\n${failures.length} provider run(s) did not succeed:`);
   for (const failure of failures) {
     console.log(`- ${failure.provider}: ${failure.warnings.join("; ")}`);
+  }
+  process.exitCode = 1;
+}
+
+const subscriptions = await fetchYoutubeSubscriptions(["@CNBCtelevision", "@YahooFinance"], {
+  hideShorts: true,
+  timeoutMs: 25_000,
+});
+
+console.log(`\n== youtube subscriptions: ${subscriptions.items.length} merged videos`);
+console.table(
+  subscriptions.channels.map(({ channel, channelId, items, error }) => ({
+    channel,
+    channelId,
+    itemCount: items.length,
+    error: error?.slice(0, 90) ?? "",
+  })),
+);
+
+const newestVideo = subscriptions.items[0];
+if (newestVideo) {
+  try {
+    const transcript = await fetchYoutubeTranscript(newestVideo.url, { timeoutMs: 25_000 });
+    console.log(
+      `transcript for ${newestVideo.url}: ${transcript.segments.length} segments, ` +
+        `${transcript.text.length} chars (${transcript.languageCode}${transcript.generated ? ", auto-generated" : ""})`,
+    );
+  } catch (error) {
+    // Not fatal: the newest video may simply have no captions yet.
+    console.log(
+      `transcript for ${newestVideo.url} failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+if (subscriptions.partial) {
+  console.log("\nyoutube subscription channel(s) failed:");
+  for (const channel of subscriptions.channels) {
+    if (channel.error) console.log(`- ${channel.channel}: ${channel.error}`);
   }
   process.exitCode = 1;
 }

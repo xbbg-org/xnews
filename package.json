@@ -1,7 +1,7 @@
 {
   "name": "@xbbg/xnews",
   "version": "0.1.0",
-  "description": "Build market news feeds from free public sources: Yahoo Finance, Google News, Bing News, SEC EDGAR (company filings, the latest-filings stream, full-text search, and press releases), Finviz, Nasdaq, Seeking Alpha, TickerTick, GDELT, Hacker News, Federal Register, CourtListener, and major market, wire, and business feeds.",
+  "description": "Build market news feeds from free public sources, including Yahoo Finance, Google News, SEC EDGAR, major market and wire feeds, plus YouTube subscriptions, captions, and realtime local or hosted audio transcription.",
   "files": [
     "dist"
   ],
@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target=node --format=esm --sourcemap=external && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "bun build ./src/index.ts --outdir ./dist --target=node --format=esm --sourcemap=external && bun run ./scripts/copy-sidecars.ts && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "prepare": "bun run build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint -c .oxlintrc.jsonc --tsconfig tsconfig.json .",

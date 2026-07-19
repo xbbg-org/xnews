@@ -116,6 +116,10 @@ These providers fetch whole public feeds and filter items locally against the su
 
 The full registry, including exact feed URLs, is exported as `FIXED_FEEDS`; membership can be checked with `isFixedFeedProvider`. Sources excluded on purpose: endpoints requiring paid plans or registered API keys (NewsAPI, Finnhub, Marketaux, Guardian/NYT developer APIs, Benzinga API), dead or stub feeds (Business Wire public RSS, CNN Money, Motley Fool foolwatch), and endpoints that block non-browser clients (OTC Markets, AccessWire, Newsfile, Investegate, Barron's).
 
+### Channel feeds (YouTube)
+
+The `youtube` provider is channel-based rather than subject-based: it does not participate in company/topic feeds (requesting it there reports `"unsupported"`) and is instead consumed through the subscription API below.
+
 Run `bun run smoke:sources` to check every provider against the live endpoints.
 
 ## General subject API
@@ -159,6 +163,91 @@ console.log(result.items.length);
 ```
 
 A watchlist result includes per-subject `NewsFeedResult` values, one merged top-level `items` list, flattened provider rows, flattened warnings, and a top-level `partial` flag.
+
+## YouTube channel subscriptions
+
+Follow a set of channels through YouTube's public per-channel Atom feeds — free and keyless, no Google account. Channels can be given as `UC…` IDs, channel URLs, or `@handles`; handles are resolved to canonical IDs by reading the channel page once.
+
+```ts
+import { fetchYoutubeSubscriptions, fetchYoutubeChannelVideos } from "@xbbg/xnews";
+
+const subs = await fetchYoutubeSubscriptions(["@CNBCtelevision", "@YahooFinance"], {
+  hideShorts: true, // fetch each channel's long-form uploads playlist instead
+  limit: 50, // caps the merged feed, not each channel
+});
+
+console.log(subs.items.length); // merged videos, newest first, kind "video"
+console.log(subs.partial); // true when any channel failed
+for (const channel of subs.channels) {
+  console.log(channel.channel, channel.channelId, channel.items.length, channel.error);
+}
+
+const one = await fetchYoutubeChannelVideos("UCrp_UI8XtuYfpiqluWLD7Lw", { limit: 5 });
+```
+
+Each upstream feed carries only the ~15 most recent uploads, so poll on an interval and merge with your own retention if you need history. Channels fail independently: one bad channel never breaks the batch. YouTube's feed endpoint intermittently returns 404 for every channel during certain hours; per-channel errors flag this so cached results can be kept until it recovers. `since`/`until` windows are enforced locally.
+
+### Video transcripts
+
+`fetchYoutubeTranscript` extracts the transcript of a video — for example any item returned by the subscription feed — through the video's advertised caption tracks, also keyless:
+
+```ts
+import { fetchYoutubeTranscript } from "@xbbg/xnews";
+
+const transcript = await fetchYoutubeTranscript(subs.items[0].url, { languages: ["en"] });
+
+console.log(transcript.languageCode, transcript.generated); // "en", true for auto-generated
+console.log(transcript.segments[0]); // { text, startMs, durationMs }
+console.log(transcript.text); // full transcript as one string
+```
+
+Tracks are listed via the InnerTube player API (whose caption URLs remain readable server-side) with the watch page as fallback, and both timedtext formats (`srv1` and `srv3`) are parsed. Track choice prefers exact language matches, then the same base language ("en" matches "en-US"), manual captions over auto-generated ones, then any available track. Videos without captions throw.
+
+### Realtime audio transcription
+
+When a video has no usable caption track, `transcribeYoutubeRealtime` can decode its audio through `yt-dlp` and FFmpeg and send 16 kHz mono PCM to either the bundled Moonshine sidecar or bounded OpenRouter transcription requests.
+
+Moonshine runs locally and emits a `ready` status followed by genuine incremental `partial` and committed `final` events. Install `yt-dlp`, FFmpeg, Python, and `moonshine-voice` separately; xnews bundles the sidecar protocol worker, not those runtimes or model weights. `moonshine-voice` must be importable by the configured Python. For an isolated on-demand environment, set `command: "uv"` and `commandArgs: ["run", "--with", "moonshine-voice", "python"]`.
+
+```ts
+import { createMoonshineAsrBackend, transcribeYoutubeRealtime } from "@xbbg/xnews";
+
+const backend = createMoonshineAsrBackend({
+  modelArch: "medium-streaming",
+  language: "en",
+});
+
+for await (const event of transcribeYoutubeRealtime(videoUrl, { backend })) {
+  if (event.type === "status") console.log(event.state);
+  if (event.type === "partial") updateLiveCaption(event);
+  if (event.type === "final") persistTranscriptLine(event);
+  if (event.type === "gap") markDiscontinuity(event);
+}
+```
+
+OpenRouter is the lower-setup hosted alternative. It uploads overlapping, WAV-encoded windows and emits committed results after each request; it is near-live chunked transcription, not a persistent streaming connection. Reconcile results by `segmentId` and `revision`, and use `sequence` only for delivery order.
+
+```ts
+import { createOpenRouterAsrBackend, transcribeYoutubeRealtime } from "@xbbg/xnews";
+
+const backend = createOpenRouterAsrBackend({
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  model: "deepgram/nova-3",
+  windowMs: 15_000,
+  overlapMs: 2_000,
+  // responseFormat: "verbose_json", // required when requesting timestamp granularities
+});
+
+for await (const event of transcribeYoutubeRealtime(videoUrl, { backend })) {
+  if (event.type === "final") console.log(event.startMs, event.text);
+}
+```
+
+Both backends also work with `transcribePcmStream` for an application-owned `AsyncIterable<Uint8Array>` of signed 16-bit little-endian PCM at 16 kHz, mono. Abort signals stop the decoder, worker, and pending requests. Live-source reconnects emit explicit `gap` events; finite videos do not reconnect at EOF. OpenRouter audio leaves the machine and incurs provider charges, while Moonshine keeps PCM local but consumes local CPU/GPU and downloads model weights on first use.
+
+Every session emits one sequenced `ready` status before transcript events. Breaking out of either async iterator cancels the backend; YouTube cancellation waits for decoder shutdown and terminates descendant processes started by wrapper commands. Event and request queues are bounded, so slow consumers apply backpressure rather than allowing output to grow without limit. On terminal FFmpeg failures, already-decoded PCM is finalized before the error is thrown, preserving the valid transcript prefix.
+
+The OpenRouter backend always sends credentials only to the official `https://openrouter.ai` origin. Its optional `responseFormat` is limited to `"json"` or `"verbose_json"`; `timestampGranularities` requires `"verbose_json"`. Injected `fetch` remains available for testing, metering, and transport policy without changing the credential destination.
 
 ## Injected fetch, proxy, timeout, and abort
 

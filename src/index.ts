@@ -26,7 +26,43 @@ export type {
   WatchTopicNewsOptions,
 } from "./types";
 
+export type { MoonshineAsrOptions, MoonshineModelArch } from "./asr/moonshine";
+export type {
+  OpenRouterAsrOptions,
+  OpenRouterFailureMode,
+  OpenRouterResponseFormat,
+  OpenRouterTimestampGranularity,
+} from "./asr/openrouter";
+export type {
+  RealtimeAsrBackend,
+  RealtimeAsrEvent,
+  RealtimeAsrFinalEvent,
+  RealtimeAsrGapEvent,
+  RealtimeAsrGapReason,
+  RealtimeAsrPartialEvent,
+  RealtimeAsrSession,
+  RealtimeAsrSessionOptions,
+  RealtimeAsrStatusEvent,
+  RealtimeAsrStatusState,
+  RealtimeAsrSpeakerSpan,
+  RealtimeAsrTiming,
+  RealtimeAsrUsage,
+  RealtimeAsrWord,
+  TranscribePcmStreamOptions,
+} from "./asr/types";
+export type { YoutubeRealtimeTranscriptOptions } from "./asr/youtube";
+
 export type { MarketEventClassification } from "./classify";
+
+export { createMoonshineAsrBackend } from "./asr/moonshine";
+export { createOpenRouterAsrBackend } from "./asr/openrouter";
+export { transcribePcmStream } from "./asr/stream";
+export {
+  REALTIME_ASR_BYTES_PER_SAMPLE,
+  REALTIME_ASR_CHANNELS,
+  REALTIME_ASR_SAMPLE_RATE,
+} from "./asr/types";
+export { transcribeYoutubeRealtime } from "./asr/youtube";
 
 export {
   buildCompanyNewsFeed,
@@ -100,5 +136,32 @@ export {
 export { fetchTickerTickNews, parseTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick";
 export { fetchYahooFinanceNews, parseYahooFinanceNews, yahooFinanceRssUrl } from "./sources/yahoo";
 export { fetchYahooSearchNews, parseYahooSearchNews, yahooSearchUrl } from "./sources/yahoosearch";
+export {
+  fetchYoutubeChannelVideos,
+  fetchYoutubeSubscriptions,
+  isYoutubeChannelId,
+  parseYoutubeChannelVideos,
+  resolveYoutubeChannelId,
+  youtubeChannelFeedUrl,
+} from "./sources/youtube";
+export type {
+  YoutubeChannelResult,
+  YoutubeFeedOptions,
+  YoutubeSubscriptionsResult,
+} from "./sources/youtube";
+export {
+  extractYoutubeVideoId,
+  fetchYoutubeTranscript,
+  parseYoutubeCaptionTracks,
+  parseYoutubeTranscriptSegments,
+  pickYoutubeCaptionTrack,
+  youtubeWatchUrl,
+} from "./sources/youtubetranscript";
+export type {
+  YoutubeCaptionTrack,
+  YoutubeTranscript,
+  YoutubeTranscriptOptions,
+  YoutubeTranscriptSegment,
+} from "./sources/youtubetranscript";
 export { inferNewsKind, parseAtomEntries, parseRssItems } from "./xml";
 export type { AtomParseOptions, RssParseOptions } from "./xml";
