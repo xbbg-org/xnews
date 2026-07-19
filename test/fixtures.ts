@@ -262,3 +262,59 @@ export const secCurrentAtomFixture = `<?xml version="1.0" encoding="ISO-8859-1" 
 <id>urn:tag:sec.gov,2008:accession-number=0001234567-26-000010</id>
 </entry>
 </feed>`;
+
+export const msrbEmmaJsonFixture = JSON.stringify({
+  status: 0,
+  data: [
+    {
+      PostingDateTime: "/Date(1784330025000)/",
+      IssuerName: "HOCKING TECHNICAL COLLEGE OHIO GEN RCPTS",
+      DisclosureCategories: "Rating Change",
+      ConfirmationFlag: true,
+      SubmissionId: "P21552419",
+      DocumentId: "P21570438",
+      TransactionId: "P22065663",
+      SecondaryMarketType: "CD",
+      CdDetailsUrl: "../MarketActivity/ContinuingDisclosureDetails/P21552419",
+      CdDocumentUrl: "/P22065663-P21570438-.pdf",
+      DisclosureDescriptions: "Rating Change",
+      IsModified: false,
+    },
+    {
+      PostingDateTime: "/Date(1784431894000)/",
+      IssuerName: "UTAH COUNTY UTAH TRANSN SALES TAX REV",
+      DisclosureCategories:
+        "Annual Financial Information and Operating Data, Audited Financial Statements or ACFR",
+      ConfirmationFlag: true,
+      SubmissionId: "P21552429",
+      DocumentId: "P21570448",
+      TransactionId: "P22065676",
+      SecondaryMarketType: "CD",
+      CdDetailsUrl: "../MarketActivity/ContinuingDisclosureDetails/P21552429",
+      CdDocumentUrl: "/P22065676-P21570448-.pdf",
+      DisclosureDescriptions:
+        "Annual Financial Information and Operating Data, Audited Financial Statements or ACFR",
+      IsModified: false,
+    },
+    {
+      PostingDateTime: "/Date(1784259000000)/",
+      IssuerName: "EXAMPLE CITY WATER & SEWER AUTH",
+      DisclosureCategories: "Bond Call",
+      ConfirmationFlag: false,
+      SubmissionId: "P21552001",
+      DocumentId: "P21570001",
+      TransactionId: "P22065001",
+      SecondaryMarketType: "CD",
+      CdDetailsUrl: "../MarketActivity/ContinuingDisclosureDetails/{0}",
+      CdDocumentUrl: "/P22065001-P21570001-.pdf",
+      DisclosureDescriptions: "Bond Call",
+      IsModified: true,
+    },
+    {
+      PostingDateTime: "/Date(1784259000000)/",
+      IssuerName: "",
+      DisclosureCategories: "Bond Call",
+      SubmissionId: "P21552002",
+    },
+  ],
+});

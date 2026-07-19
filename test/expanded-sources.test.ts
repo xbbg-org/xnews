@@ -4,12 +4,14 @@ import {
   buildTopicNewsFeedResult,
   FIXED_FEED_PROVIDERS,
   FIXED_FEEDS,
+  msrbEmmaPeriods,
   parseBingNews,
   parseCourtListenerNews,
   parseFederalRegisterNews,
   parseFixedFeedNews,
   parseGdeltNews,
   parseHackerNewsStories,
+  parseMsrbEmmaDisclosures,
   parseNasdaqNews,
   parseSecCurrentFilings,
   parseSecFullTextFilings,
@@ -27,6 +29,7 @@ import {
   gdeltJsonFixture,
   hackerNewsJsonFixture,
   marketFeedRssFixture,
+  msrbEmmaJsonFixture,
   nasdaqRssFixture,
   secCurrentAtomFixture,
   secFullTextJsonFixture,
@@ -470,4 +473,116 @@ test("sec-current topic subjects stream the market-wide feed and filter locally"
   expect(result.items.map((item) => item.title)).toEqual([
     "4 - Insurance Holdings Corp (0001234567) (Issuer)",
   ]);
+});
+
+test("parses MSRB EMMA continuing disclosures with details links and .NET dates", () => {
+  const items = parseMsrbEmmaDisclosures(msrbEmmaJsonFixture);
+
+  expect(items).toHaveLength(3);
+  expect(items[0]).toMatchObject({
+    provider: "msrb-emma",
+    kind: "filing",
+    title: "HOCKING TECHNICAL COLLEGE OHIO GEN RCPTS: Rating Change",
+    url: "https://emma.msrb.org/MarketActivity/ContinuingDisclosureDetails/P21552419",
+    canonicalUrl: "https://emma.msrb.org/MarketActivity/ContinuingDisclosureDetails/P21552419",
+    source: "MSRB EMMA",
+    companyName: "HOCKING TECHNICAL COLLEGE OHIO GEN RCPTS",
+    publishedAt: "2026-07-17T23:13:45.000Z",
+  });
+  expect(items[2]).toMatchObject({
+    title: "EXAMPLE CITY WATER & SEWER AUTH: Bond Call (Modified) (Unconfirmed)",
+    url: "https://emma.msrb.org/MarketActivity/ContinuingDisclosureDetails/P21552001",
+    publishedAt: "2026-07-17T03:30:00.000Z",
+  });
+});
+
+test("msrb-emma filters disclosures by subject terms locally", () => {
+  const byQuery = parseMsrbEmmaDisclosures(msrbEmmaJsonFixture, {
+    terms: { query: "rating change" },
+  });
+  expect(byQuery.map((item) => item.title)).toEqual([
+    "HOCKING TECHNICAL COLLEGE OHIO GEN RCPTS: Rating Change",
+  ]);
+
+  const byIssuer = parseMsrbEmmaDisclosures(msrbEmmaJsonFixture, {
+    terms: { companyName: "Utah County Utah Transn Sales Tax Rev" },
+  });
+  expect(byIssuer).toHaveLength(1);
+  expect(byIssuer[0]?.companyName).toBe("UTAH COUNTY UTAH TRANSN SALES TAX REV");
+});
+
+test("msrbEmmaPeriods maps date windows onto EMMA posting windows", () => {
+  const wednesdayNoonEt = Date.UTC(2026, 6, 15, 16, 0, 0);
+  expect(msrbEmmaPeriods({ period: "LastWeek" }, wednesdayNoonEt)).toEqual(["LastWeek"]);
+  expect(msrbEmmaPeriods({}, wednesdayNoonEt)).toEqual(["Today", "Yesterday"]);
+  expect(msrbEmmaPeriods({ since: "2026-07-14T00:00:00.000Z" }, wednesdayNoonEt)).toEqual([
+    "Today",
+    "Yesterday",
+    "ThisWeek",
+  ]);
+  expect(msrbEmmaPeriods({ since: "2026-07-05T12:00:00.000Z" }, wednesdayNoonEt)).toEqual([
+    "Today",
+    "Yesterday",
+    "ThisWeek",
+    "LastWeek",
+  ]);
+
+  // On Sundays ThisWeek adds nothing beyond Today+Yesterday and is skipped.
+  const sundayNoonEt = Date.UTC(2026, 6, 19, 16, 0, 0);
+  expect(msrbEmmaPeriods({ since: "2026-07-05T12:00:00.000Z" }, sundayNoonEt)).toEqual([
+    "Today",
+    "Yesterday",
+    "LastWeek",
+  ]);
+});
+
+test("msrb-emma topic subjects stream recent windows and dedupe overlaps", async () => {
+  const fetchedUrls: string[] = [];
+  const result = await buildTopicNewsFeedResult({
+    query: "rating change",
+    sources: ["msrb-emma"],
+    fetch: async (input) => {
+      fetchedUrls.push(fetchInputUrl(input));
+      return new Response(msrbEmmaJsonFixture);
+    },
+  });
+
+  expect(fetchedUrls.map((url) => new URL(url).searchParams.get("selectedPeriod"))).toEqual([
+    "Today",
+    "Yesterday",
+  ]);
+  for (const url of fetchedUrls) {
+    expect(url.startsWith("https://emma.msrb.org/MarketActivity/GetCdData")).toBe(true);
+  }
+  expect(providerCapabilities("msrb-emma")).toEqual(["company", "topic", "filing"]);
+
+  const provider = result.providers[0];
+  expect(provider?.status).toBe("ok");
+  expect(provider?.requestUrls).toEqual(fetchedUrls);
+  expect(result.items.map((item) => item.title)).toEqual([
+    "HOCKING TECHNICAL COLLEGE OHIO GEN RCPTS: Rating Change",
+  ]);
+});
+
+test("msrb-emma company subjects match issuer names and require a name", async () => {
+  const result = await buildCompanyNewsFeedResult({
+    ticker: "",
+    companyName: "Utah County Utah Transn Sales Tax Rev",
+    sources: ["msrb-emma"],
+    fetch: async () => new Response(msrbEmmaJsonFixture),
+  });
+  expect(result.providers[0]?.status).toBe("ok");
+  expect(result.items.map((item) => item.title)).toEqual([
+    "UTAH COUNTY UTAH TRANSN SALES TAX REV: Annual Financial Information and Operating Data, Audited Financial Statements or ACFR",
+  ]);
+
+  const nameless = await buildCompanyNewsFeedResult({
+    ticker: "MUB",
+    sources: ["msrb-emma"],
+    fetch: async () => {
+      throw new Error("should not fetch");
+    },
+  });
+  expect(nameless.providers[0]?.status).toBe("unsupported");
+  expect(nameless.warnings).toEqual(["msrb-emma: companyName is required"]);
 });

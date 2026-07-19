@@ -15,6 +15,7 @@ const QUERY_PROVIDERS: readonly NewsProvider[] = [
   "sec-current",
   "federal-register",
   "courtlistener",
+  "msrb-emma",
   "nasdaq",
   "seeking-alpha",
 ];

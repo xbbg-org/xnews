@@ -79,10 +79,11 @@ These providers query their upstream endpoint per subject.
 | `sec-current`      | company, topic, filing | companyName           | SEC EDGAR latest-filings stream (`secForms` supported; company uses EDGAR's name search over current filings, topics filter the stream locally) |
 | `federal-register` | company, topic         | companyName           | Federal Register documents API                                                                                                                  |
 | `courtlistener`    | company, topic         | companyName           | CourtListener opinion search feed                                                                                                               |
+| `msrb-emma`        | company, topic, filing | companyName           | MSRB EMMA municipal continuing disclosures (rating changes, bond calls, financials; subjects filter the stream locally by issuer name or query) |
 | `nasdaq`           | company                | ticker                | Nasdaq per-symbol RSS                                                                                                                           |
 | `seeking-alpha`    | company                | ticker                | Seeking Alpha per-symbol RSS                                                                                                                    |
 
-`since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`) and always enforced locally after fetching.
+`since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`) and always enforced locally after fetching. `msrb-emma` maps `since` onto EMMA's fixed posting windows: it fetches Today+Yesterday by default and widens to ThisWeek/LastWeek (EMMA's maximum lookback) when the window reaches further back.
 
 ### Fixed market and business feeds
 

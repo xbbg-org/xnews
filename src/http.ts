@@ -59,6 +59,11 @@ function makeHeaders(url: string, options: SourceFetchOptions): HeadersInit {
   if (host.endsWith("sec.gov")) {
     headers["User-Agent"] = options.secUserAgent ?? options.userAgent ?? DEFAULT_SEC_USER_AGENT;
   }
+  // EMMA serves its Terms-of-Use interstitial page instead of data until the
+  // ToU acceptance cookie is present; the server only checks its existence.
+  if (host === "emma.msrb.org") {
+    headers["Cookie"] = "Disclaimer6=msrborg";
+  }
 
   return headers;
 }

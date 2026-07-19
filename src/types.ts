@@ -12,6 +12,7 @@ export type NewsProvider =
   | "sec-current"
   | "federal-register"
   | "courtlistener"
+  | "msrb-emma"
   | "nasdaq"
   | "seeking-alpha"
   | "marketwatch"

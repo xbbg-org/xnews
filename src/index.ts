@@ -73,6 +73,13 @@ export {
 } from "./sources/hackernews";
 export { subjectMatcher } from "./sources/match";
 export type { SubjectMatchItem, SubjectMatchTerms } from "./sources/match";
+export {
+  fetchMsrbEmmaDisclosures,
+  msrbEmmaCdUrl,
+  msrbEmmaPeriods,
+  parseMsrbEmmaDisclosures,
+} from "./sources/msrbemma";
+export type { MsrbEmmaFetchOptions, MsrbEmmaPeriod } from "./sources/msrbemma";
 export { fetchNasdaqNews, nasdaqRssUrl, parseNasdaqNews } from "./sources/nasdaq";
 export { fetchSecFilings, parseSecFilings, secCompanyAtomUrl } from "./sources/sec";
 export {

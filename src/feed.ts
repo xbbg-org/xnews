@@ -9,6 +9,7 @@ import { fetchGdeltNews, gdeltDocUrl } from "./sources/gdelt";
 import { fetchGoogleNews, googleNewsRssUrl } from "./sources/google";
 import { fetchHackerNewsStories, hackerNewsSearchUrl } from "./sources/hackernews";
 import type { SubjectMatchTerms } from "./sources/match";
+import { fetchMsrbEmmaDisclosures, msrbEmmaCdUrl, msrbEmmaPeriods } from "./sources/msrbemma";
 import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq";
 import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec";
 import { fetchSecCurrentFilings, secCurrentAtomUrl } from "./sources/seccurrent";
@@ -64,6 +65,7 @@ const QUERY_PROVIDER_CAPABILITIES: Partial<
   "sec-current": ["company", "topic", "filing"],
   "federal-register": ["company", "topic"],
   courtlistener: ["company", "topic"],
+  "msrb-emma": ["company", "topic", "filing"],
   nasdaq: ["company"],
   "seeking-alpha": ["company"],
 };
@@ -80,6 +82,7 @@ const COMPANY_SUBJECT_REQUIREMENTS: Partial<Record<NewsProvider, CompanySubjectR
   "sec-current": "name",
   "federal-register": "name",
   courtlistener: "name",
+  "msrb-emma": "name",
 };
 
 export async function buildCompanyNewsFeed(query: CompanyNewsQuery): Promise<NewsItem[]> {
@@ -380,6 +383,8 @@ async function fetchSource(
     return fetchFederalRegisterNews(requiredCompanyNameOrTopic(provider, subject), options);
   if (provider === "courtlistener")
     return fetchCourtListenerNews(requiredCompanyNameOrTopic(provider, subject), options);
+  if (provider === "msrb-emma")
+    return fetchMsrbEmmaDisclosures(subjectMatchTerms(subject), options);
   if (provider === "nasdaq") return fetchNasdaqNews(requiredTicker(provider, subject), options);
   if (provider === "seeking-alpha")
     return fetchSeekingAlphaNews(requiredTicker(provider, subject), options);
@@ -433,6 +438,8 @@ function providerRequestUrls(
     return [federalRegisterSearchUrl(requiredCompanyNameOrTopic(provider, subject), options)];
   if (provider === "courtlistener")
     return [courtListenerSearchUrl(requiredCompanyNameOrTopic(provider, subject), options)];
+  if (provider === "msrb-emma")
+    return msrbEmmaPeriods(options).map((period) => msrbEmmaCdUrl(period));
   if (provider === "nasdaq") return [nasdaqRssUrl(requiredTicker(provider, subject))];
   if (provider === "seeking-alpha") return [seekingAlphaRssUrl(requiredTicker(provider, subject))];
   if (isFixedFeedProvider(provider)) return FIXED_FEEDS[provider].urls;
