@@ -19,6 +19,7 @@ import {
   parseTickerTickNews,
   parseYahooSearchNews,
   providerCapabilities,
+  secFullTextSearchUrl,
   subjectMatcher,
 } from "../src";
 import {
@@ -32,7 +33,9 @@ import {
   msrbEmmaJsonFixture,
   nasdaqRssFixture,
   secCurrentAtomFixture,
+  secFullTextErrorJsonFixture,
   secFullTextJsonFixture,
+  secFullTextXslJsonFixture,
   seekingAlphaRssFixture,
   tickerTickJsonFixture,
   yahooSearchJsonFixture,
@@ -136,10 +139,35 @@ test("parses SEC full-text hits into archive filing links", () => {
     formType: "8-K",
     accessionNumber: "0001193125-26-123456",
     cik: "898174",
+    fileNumber: "001-11848",
     filingDate: "2026-06-22",
     summary: "CURRENT REPORT",
   });
   expect(items[0]?.publishedAt).toBe("2026-06-22T00:00:00.000Z");
+});
+
+test("renders XML ownership filings through their XSL stylesheet path", () => {
+  const items = parseSecFullTextFilings(secFullTextXslJsonFixture, {});
+
+  expect(items).toHaveLength(1);
+  expect(items[0]?.url).toBe(
+    "https://www.sec.gov/Archives/edgar/data/898174/000118143126054321/xslF345X03/primary_doc.xml",
+  );
+  expect(items[0]?.formType).toBe("4");
+});
+
+test("throws on EFTS errorType payloads served with HTTP 200", () => {
+  expect(() => parseSecFullTextFilings(secFullTextErrorJsonFixture)).toThrow(
+    /Result window is too large/,
+  );
+});
+
+test("scopes SEC full-text search to an entity via ticker or padded CIK", () => {
+  expect(secFullTextSearchUrl("earnings", { ticker: "NVDA" })).toContain("entityName=NVDA");
+  expect(secFullTextSearchUrl("earnings", { ticker: "1045810" })).toContain(
+    "entityName=0001045810",
+  );
+  expect(secFullTextSearchUrl("earnings", {})).not.toContain("entityName");
 });
 
 test("parses Federal Register documents with agency sources", () => {

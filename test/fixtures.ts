@@ -159,10 +159,40 @@ export const secFullTextJsonFixture = JSON.stringify({
           form: "8-K",
           adsh: "0001193125-26-123456",
           file_description: "CURRENT REPORT",
+          file_num: ["001-11848"],
+          xsl: null,
         },
       },
     ],
   },
+});
+
+export const secFullTextXslJsonFixture = JSON.stringify({
+  hits: {
+    total: { value: 1, relation: "eq" },
+    hits: [
+      {
+        _id: "0001181431-26-054321:primary_doc.xml",
+        _source: {
+          ciks: ["0000898174"],
+          display_names: ["Doe Jane  (CIK 0001234567)"],
+          file_date: "2026-06-24",
+          file_type: "4",
+          form: "4",
+          adsh: "0001181431-26-054321",
+          file_description: null,
+          file_num: ["001-11848"],
+          xsl: "xslF345X03",
+        },
+      },
+    ],
+  },
+});
+
+export const secFullTextErrorJsonFixture = JSON.stringify({
+  errorType: "ResponseError",
+  errorMessage:
+    "search_phase_execution_exception: [illegal_argument_exception] Reason: Result window is too large",
 });
 
 export const federalRegisterJsonFixture = JSON.stringify({

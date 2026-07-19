@@ -423,6 +423,7 @@ function providerRequestUrls(
       secFullTextSearchUrl(plainQueryFromSubject(subject), {
         ...options,
         ...(query.secForms?.length ? { forms: query.secForms } : {}),
+        ...(subject.ticker ? { ticker: subject.ticker } : {}),
       }),
     ];
   }

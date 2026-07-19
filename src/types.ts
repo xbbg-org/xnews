@@ -102,6 +102,7 @@ export interface NewsItem {
   relatedTickers?: readonly string[];
   readonly canonicalUrl?: string;
   readonly cik?: string;
+  readonly fileNumber?: string;
   readonly companyName?: string;
   readonly filingDate?: string;
   readonly reportDate?: string;
