@@ -1,0 +1,55 @@
+name: New source request
+description: Propose a new news provider for the catalog
+labels: ["source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        xnews only ships free, keyless, public endpoints. Sources requiring paid plans or
+        registered API keys, and endpoints that block non-browser clients, are excluded on
+        purpose — see the exclusion list in the README source catalog.
+
+  - type: input
+    id: name
+    attributes:
+      label: Source name
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint URL
+      description: The exact feed or API URL a fetch would hit.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: capabilities
+    attributes:
+      label: Capabilities
+      multiple: true
+      options:
+        - company
+        - topic
+        - filing
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: eligibility
+    attributes:
+      label: Eligibility
+      options:
+        - label: Free with no API key or registration
+          required: true
+        - label: Serves non-browser clients (plain fetch, no JS execution required)
+          required: true
+        - label: Terms of use permit automated retrieval
+          required: true
+
+  - type: textarea
+    id: rate_limits
+    attributes:
+      label: Known rate limits or usage constraints
+      placeholder: "e.g. ~1 request / 5 s per IP"

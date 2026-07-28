@@ -2,8 +2,33 @@
   "name": "@xbbg/xnews",
   "version": "0.1.0",
   "description": "Build market news feeds from free public sources, including Yahoo Finance, Google News, SEC EDGAR, major market and wire feeds, plus YouTube subscriptions, captions, and realtime local or hosted audio transcription.",
+  "keywords": [
+    "edgar",
+    "finance",
+    "google-news",
+    "market-data",
+    "news",
+    "rss",
+    "sec",
+    "transcription",
+    "typescript",
+    "yahoo-finance",
+    "youtube"
+  ],
+  "homepage": "https://github.com/xbbg-org/xnews#readme",
+  "bugs": {
+    "url": "https://github.com/xbbg-org/xnews/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "Alpha x1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xbbg-org/xnews.git"
+  },
   "files": [
-    "dist"
+    "dist/**",
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -12,11 +37,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target=node --format=esm --sourcemap=external && bun run ./scripts/copy-sidecars.ts && tsc -p tsconfig.build.json --emitDeclarationOnly",
-    "prepare": "bun run build",
+    "build": "bun build ./src/index.ts --outdir ./dist --target=node --format=esm --sourcemap=linked && bun run ./scripts/copy-sidecars.ts && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint -c .oxlintrc.jsonc --tsconfig tsconfig.json .",
     "lint:fix": "oxlint -c .oxlintrc.jsonc --tsconfig tsconfig.json --fix .",
@@ -24,15 +54,25 @@
     "format:check": "oxfmt --config .oxfmtrc.json --check .",
     "check": "bun run typecheck && bun run lint && bun run format:check",
     "test": "bun test",
+    "pack:dry-run": "npm pack --dry-run",
+    "pack:lint": "publint --strict",
+    "types:attw": "attw --pack . --profile node16 --ignore-rules cjs-resolves-to-esm",
+    "quality": "bun run check && bun test && bun run build && bun run pack:lint && bun run types:attw",
     "smoke:rga": "bun run ./scripts/smoke-rga.ts",
-    "smoke:sources": "bun run ./scripts/smoke-sources.ts"
+    "smoke:sources": "bun run ./scripts/smoke-sources.ts",
+    "smoke:packaged-install": "bun run ./scripts/smoke-packaged-install.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@types/bun": "^1.3.14",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.72.0",
     "oxlint-tsgolint": "^0.24.0",
+    "publint": "^0.3.21",
     "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "packageManager": "bun@1.3.14"
 }

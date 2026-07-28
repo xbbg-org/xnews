@@ -1,0 +1,117 @@
+name: Publish npm Package
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable npm version/tag to publish from the current workflow commit (e.g. v1.2.3). Required for manual retries."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-version:
+    name: Resolve npm release version
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.version.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            RAW_VERSION="${{ inputs.version }}"
+          else
+            RAW_VERSION="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "$RAW_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              echo "::error::npm publishes require a stable semver tag/version like v1.2.3; got '$RAW_VERSION'"
+              exit 1
+            fi
+            echo "::notice::Skipping npm publish for non-stable tag '$RAW_VERSION'"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "Publishing npm package for ${RAW_VERSION}"
+
+  publish:
+    name: Publish @xbbg/xnews
+    needs: release-version
+    if: needs.release-version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure npm trusted publishing support
+        run: |
+          npm install -g npm@^11.10.0
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The tag is the source of truth. A tag that disagrees with the committed
+      # manifest would publish a version nobody can reproduce from this ref.
+      - name: Verify manifest version matches tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST_VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED="${{ needs.release-version.outputs.version }}"
+          if [[ "$MANIFEST_VERSION" != "$EXPECTED" ]]; then
+            echo "::error::package.json version ($MANIFEST_VERSION) does not match release tag ($EXPECTED)"
+            exit 1
+          fi
+          echo "Manifest and tag agree on ${EXPECTED}"
+
+      - name: Run quality suite
+        run: bun run quality
+
+      - name: Smoke test packaged install
+        run: bun run smoke:packaged-install
+
+      - name: Publish with trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_USERCONFIG
+
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry https://registry.npmjs.org --loglevel=silent >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping"
+            exit 0
+          fi
+
+          echo "Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION}"
+          npm publish --provenance --access public --registry https://registry.npmjs.org

@@ -1,0 +1,7 @@
+# Default owner for everything in this repository.
+* @alpha-xone
+
+# Release-critical surfaces.
+/.github/ @alpha-xone
+/package.json @alpha-xone
+/src/index.ts @alpha-xone

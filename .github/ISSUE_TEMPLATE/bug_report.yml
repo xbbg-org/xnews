@@ -1,0 +1,57 @@
+name: Bug report
+description: Report incorrect behavior in xnews
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Upstream feeds change without notice. Before filing, check whether the provider
+        endpoint itself still returns what you expect — `ProviderResult.warnings` and
+        `requestUrls` usually say.
+
+  - type: input
+    id: version
+    attributes:
+      label: xnews version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Node or Bun version, and OS.
+      placeholder: "Node 24.4.0 on Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Affected provider(s)
+      placeholder: "sec-edgar, google-news"
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal code that reproduces the problem.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include `ProviderResult.status`, `warnings`, and `requestUrls` if available.
+    validations:
+      required: true

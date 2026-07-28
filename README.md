@@ -1,14 +1,22 @@
 # xnews
 
+[![CI](https://github.com/xbbg-org/xnews/actions/workflows/ci.yml/badge.svg)](https://github.com/xbbg-org/xnews/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@xbbg/xnews.svg)](https://www.npmjs.com/package/@xbbg/xnews)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Pure fetch/parse/normalize utilities for building company, topic, and watchlist market-news feeds from free public sources. The package does not persist data, schedule jobs, store state, score sentiment, or provide investment advice.
 
 ## Install
 
 ```sh
+npm install @xbbg/xnews
+```
+
+```sh
 bun add @xbbg/xnews
 ```
 
-The published package exports ESM from `dist/index.js` and TypeScript declarations from `dist/index.d.ts`.
+Requires Node 24 or newer. The package is **ESM-only**: it exports ESM from `dist/index.js` with TypeScript declarations at `dist/index.d.ts`, and has no CommonJS build. CommonJS callers must use a dynamic `import()`.
 
 ## Company feed
 
@@ -283,3 +291,13 @@ The package keeps a default SEC user agent for compatibility, but production cal
 All providers are public web feeds and endpoints whose terms, availability, markup, URLs, and throttling behavior can change without notice. SEC EDGAR responses can vary by identifier, form, count, and user-agent policy. GDELT and TickerTick enforce per-IP rate limits; shared egress IPs can see `429` responses that surface as provider errors while other providers keep working.
 
 Inspect `ProviderResult.status`, `warnings`, `requestUrls`, `fetchedAt`, `durationMs`, and `partial` before trusting a feed as complete. A successful package call can still be partial when one provider fails or is unsupported.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the quality gate, and the
+conventions for adding a source. Security issues follow [SECURITY.md](SECURITY.md) —
+please do not open a public issue for a vulnerability.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

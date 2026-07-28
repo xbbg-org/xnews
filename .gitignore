@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
+__pycache__/
+*.py[cod]
+.omc/
+*.tgz
