@@ -68,6 +68,8 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          # npm's release guidance: never restore a cache into a publish build.
+          package-manager-cache: false
 
       - name: Ensure npm trusted publishing support
         run: |
