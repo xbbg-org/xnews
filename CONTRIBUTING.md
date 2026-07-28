@@ -55,16 +55,33 @@ manual check, not part of CI, because it depends on third-party availability.
 
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
 - Record user-visible changes under `## [Unreleased]` in `CHANGELOG.md`.
-- Releases are tag-driven: pushing a `vX.Y.Z` tag triggers `npm-publish.yml`, which
-  refuses to publish if `package.json` disagrees with the tag. Bump the manifest version
-  and move the `[Unreleased]` section before tagging.
 - Publishing goes through npm trusted publishing (OIDC). The workflow holds no npm token
   and the registry only accepts publishes from `npm-publish.yml` on this repository, so
-  no `NPM_TOKEN` secret should ever be added.
+  no `NPM_TOKEN` secret should ever be added. Renaming that workflow file breaks the
+  registry's trust configuration, and only fails at publish time.
 - Do not add `sideEffects: false` to `package.json`. `bun build` then tree-shakes pure
   re-exported declarations such as `FIXED_FEEDS` out of the bundle while leaving them in
   the export list, so the published tarball fails to link under Node.
   `bun run smoke:packaged-install` is what catches this.
+
+Cutting a release is one command:
+
+```sh
+bun run release patch            # or minor, major, or an explicit 1.2.3
+bun run release patch --dry-run  # validate and print the notes, change nothing
+```
+
+It refuses to run unless you are on `main`, the tree is clean, and `HEAD` matches
+`origin/main`. It then runs `quality` plus `smoke:packaged-install`, bumps the manifest,
+promotes `[Unreleased]` to a dated section with fresh compare links, commits, and creates
+an annotated tag whose message is the release notes. Add `--push` to push both, or run the
+two commands it prints.
+
+Pushing the `vX.Y.Z` tag is what triggers `npm-publish.yml`: it re-runs the gates, refuses
+to publish if `package.json` disagrees with the tag, publishes to npm over OIDC, and cuts
+the GitHub release from the matching `CHANGELOG.md` section. The tag is created locally
+rather than by CI because a tag pushed with `GITHUB_TOKEN` does not trigger workflows, so a
+bot-driven bump would never publish.
 
 ## License
 
