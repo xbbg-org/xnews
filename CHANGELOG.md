@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `bun run release <patch|minor|major|X.Y.Z>` cuts a release: it verifies the checkout is clean and synced, runs the quality and packaged-install gates, bumps the manifest, promotes `[Unreleased]` to a dated section with fresh compare links, commits, and writes an annotated tag whose message is the release notes. `--dry-run` validates without changing anything.
+- `npm-publish.yml` now cuts the GitHub release from the matching `CHANGELOG.md` section, so the tag, the npm tarball, and the GitHub release notes cannot drift apart.
+
 ## [0.1.1] - 2026-07-28
 
 ### Changed

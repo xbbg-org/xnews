@@ -60,7 +60,9 @@
     "quality": "bun run check && bun test && bun run build && bun run pack:lint && bun run types:attw",
     "smoke:rga": "bun run ./scripts/smoke-rga.ts",
     "smoke:sources": "bun run ./scripts/smoke-sources.ts",
-    "smoke:packaged-install": "bun run ./scripts/smoke-packaged-install.ts"
+    "smoke:packaged-install": "bun run ./scripts/smoke-packaged-install.ts",
+    "changelog:section": "bun run ./scripts/changelog.ts section",
+    "release": "bun run ./scripts/release.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",

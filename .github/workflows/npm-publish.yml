@@ -117,3 +117,47 @@ jobs:
 
           echo "Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION}"
           npm publish --provenance --access public --registry https://registry.npmjs.org
+
+  github-release:
+    name: Publish GitHub release
+    needs: [release-version, publish]
+    if: needs.release-version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # CHANGELOG.md is the single source of release notes, so the GitHub release
+      # cannot drift from what the tag and the npm tarball claim to contain.
+      - name: Create release from changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release-version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "GitHub release v${VERSION} already exists; skipping"
+            exit 0
+          fi
+
+          # workflow_dispatch retries can run before the tag exists. A release
+          # would then invent a tag on the dispatched ref, so skip instead.
+          if ! git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "::notice::tag v${VERSION} is not on origin; skipping GitHub release"
+            exit 0
+          fi
+
+          bun run ./scripts/changelog.ts section "${VERSION}" > "${RUNNER_TEMP}/notes.md"
+          gh release create "v${VERSION}" \
+            --verify-tag \
+            --title "v${VERSION}" \
+            --notes-file "${RUNNER_TEMP}/notes.md"
