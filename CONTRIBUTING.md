@@ -58,6 +58,13 @@ manual check, not part of CI, because it depends on third-party availability.
 - Releases are tag-driven: pushing a `vX.Y.Z` tag triggers `npm-publish.yml`, which
   refuses to publish if `package.json` disagrees with the tag. Bump the manifest version
   and move the `[Unreleased]` section before tagging.
+- Publishing goes through npm trusted publishing (OIDC). The workflow holds no npm token
+  and the registry only accepts publishes from `npm-publish.yml` on this repository, so
+  no `NPM_TOKEN` secret should ever be added.
+- Do not add `sideEffects: false` to `package.json`. `bun build` then tree-shakes pure
+  re-exported declarations such as `FIXED_FEEDS` out of the bundle while leaving them in
+  the export list, so the published tarball fails to link under Node.
+  `bun run smoke:packaged-install` is what catches this.
 
 ## License
 
