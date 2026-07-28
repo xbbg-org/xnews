@@ -1,6 +1,6 @@
 {
   "name": "@xbbg/xnews",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Build market news feeds from free public sources, including Yahoo Finance, Google News, SEC EDGAR, major market and wire feeds, plus YouTube subscriptions, captions, and realtime local or hosted audio transcription.",
   "keywords": [
     "edgar",
