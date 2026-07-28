@@ -1,4 +1,4 @@
-import type { SourceFetchOptions } from "./types";
+import type { SourceFetchOptions } from "./types.js";
 
 const DEFAULT_USER_AGENT = "xnews/0.1.0 (+public market news research)";
 const DEFAULT_SEC_USER_AGENT = "xnews/0.1.0 contact@example.com";

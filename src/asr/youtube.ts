@@ -1,14 +1,14 @@
 import { Buffer } from "node:buffer";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
-import { extractYoutubeVideoId, youtubeWatchUrl } from "../sources/youtubetranscript";
+import { extractYoutubeVideoId, youtubeWatchUrl } from "../sources/youtubetranscript.js";
 import {
   REALTIME_ASR_SAMPLE_RATE,
   type RealtimeAsrBackend,
   type RealtimeAsrEvent,
   type RealtimeAsrSession,
   type RealtimeAsrSessionOptions,
-} from "./types";
+} from "./types.js";
 
 const DEFAULT_FORMAT = "bestaudio/best";
 const DEFAULT_RECONNECT_ATTEMPTS = 3;

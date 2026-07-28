@@ -1,7 +1,7 @@
-import { fetchText } from "../http";
-import { normalizeLimit } from "../options";
-import { parseAtomEntries } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { normalizeLimit } from "../options.js";
+import { parseAtomEntries } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 interface SecFetchOptions extends SourceFetchOptions {
   forms?: readonly string[];

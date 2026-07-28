@@ -1,9 +1,9 @@
-import { fetchText } from "../http";
-import { parseJsonRecord, recordArray, stringField } from "../json";
-import { normalizeDateWindow, normalizeLimit } from "../options";
-import { stableId, toAbsoluteUrl } from "../text";
-import { subjectMatcher, type SubjectMatchTerms } from "./match";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseJsonRecord, recordArray, stringField } from "../json.js";
+import { normalizeDateWindow, normalizeLimit } from "../options.js";
+import { stableId, toAbsoluteUrl } from "../text.js";
+import { subjectMatcher, type SubjectMatchTerms } from "./match.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /** EMMA's four fixed posting windows for the continuing-disclosure feed. */
 export type MsrbEmmaPeriod = "Today" | "Yesterday" | "ThisWeek" | "LastWeek";

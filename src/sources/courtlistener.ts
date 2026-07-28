@@ -1,6 +1,6 @@
-import { fetchText } from "../http";
-import { parseAtomEntries } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseAtomEntries } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /** CourtListener search feed (https://www.courtlistener.com, Free Law Project). */
 export function courtListenerSearchUrl(

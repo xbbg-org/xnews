@@ -1,4 +1,4 @@
-import type { NewsItem } from "../types";
+import type { NewsItem } from "../types.js";
 
 export interface SubjectMatchTerms {
   readonly ticker?: string;

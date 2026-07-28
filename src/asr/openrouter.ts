@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
-import type { SourceFetch } from "../types";
-import { AsyncEventQueue, cancellableAsyncIterator } from "./queue";
+import type { SourceFetch } from "../types.js";
+import { AsyncEventQueue, cancellableAsyncIterator } from "./queue.js";
 import {
   REALTIME_ASR_BYTES_PER_SAMPLE,
   REALTIME_ASR_CHANNELS,
@@ -13,7 +13,7 @@ import {
   type RealtimeAsrSessionOptions,
   type RealtimeAsrUsage,
   type RealtimeAsrWord,
-} from "./types";
+} from "./types.js";
 
 const DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/audio/transcriptions";
 const DEFAULT_MODEL = "deepgram/nova-3";

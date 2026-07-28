@@ -1,8 +1,8 @@
-import { fetchText } from "../http";
-import { isRecord, parseJsonRecord, recordArray, stringArrayField, stringField } from "../json";
-import { normalizeLimit } from "../options";
-import { stableId } from "../text";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { isRecord, parseJsonRecord, recordArray, stringArrayField, stringField } from "../json.js";
+import { normalizeLimit } from "../options.js";
+import { stableId } from "../text.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 interface SecFullTextOptions extends SourceFetchOptions {
   forms?: readonly string[];

@@ -1,8 +1,8 @@
-import { fetchText } from "../http";
-import { normalizeLimit } from "../options";
-import { parseRssItems } from "../xml";
-import { subjectMatcher, type SubjectMatchTerms } from "./match";
-import type { NewsItem, NewsKind, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { normalizeLimit } from "../options.js";
+import { parseRssItems } from "../xml.js";
+import { subjectMatcher, type SubjectMatchTerms } from "./match.js";
+import type { NewsItem, NewsKind, SourceFetchOptions } from "../types.js";
 
 const BROWSERISH_USER_AGENT = "Mozilla/5.0 xnews/0.1.0";
 

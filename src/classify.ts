@@ -1,4 +1,4 @@
-import type { MarketEventKind, NewsItem } from "./types";
+import type { MarketEventKind, NewsItem } from "./types.js";
 
 export interface MarketEventClassification {
   readonly eventKind?: MarketEventKind;

@@ -11,8 +11,8 @@ import {
   transcribeYoutubeRealtime,
   type RealtimeAsrBackend,
   type RealtimeAsrEvent,
-} from "../src";
-import type { SourceFetch } from "../src/types";
+} from "../src/index.js";
+import type { SourceFetch } from "../src/types.js";
 
 const SIDECAR_PATH = fileURLToPath(new URL("../src/asr/moonshine-worker.py", import.meta.url));
 const SIDECAR_FIXTURE = fileURLToPath(new URL("./fixtures/asr-sidecar.mjs", import.meta.url));

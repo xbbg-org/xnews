@@ -4,8 +4,8 @@ import {
   fetchYoutubeSubscriptions,
   fetchYoutubeTranscript,
   providerCapabilities,
-} from "../src";
-import type { NewsProvider, ProviderResult } from "../src";
+} from "../src/index.js";
+import type { NewsProvider, ProviderResult } from "../src/index.js";
 
 const QUERY_PROVIDERS: readonly NewsProvider[] = [
   "yahoo-finance",

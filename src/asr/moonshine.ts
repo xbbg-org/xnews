@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { access } from "node:fs/promises";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { AsyncEventQueue, cancellableAsyncIterator } from "./queue";
+import { AsyncEventQueue, cancellableAsyncIterator } from "./queue.js";
 import type {
   RealtimeAsrBackend,
   RealtimeAsrEvent,
@@ -12,7 +12,7 @@ import type {
   RealtimeAsrSessionOptions,
   RealtimeAsrSpeakerSpan,
   RealtimeAsrWord,
-} from "./types";
+} from "./types.js";
 
 const PROTOCOL_VERSION = 1;
 const FRAME_PCM = 1;

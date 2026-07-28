@@ -1,9 +1,9 @@
-import { fetchText } from "../http";
-import { parseJsonRecord, recordArray, stringField } from "../json";
-import { normalizeLimit } from "../options";
-import { stableId } from "../text";
-import { inferNewsKind } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseJsonRecord, recordArray, stringField } from "../json.js";
+import { normalizeLimit } from "../options.js";
+import { stableId } from "../text.js";
+import { inferNewsKind } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /**
  * GDELT DOC 2.0 API (https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/):

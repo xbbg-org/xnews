@@ -1,6 +1,6 @@
-import { cleanText, decodeEntities, stableId, stripCdata } from "./text";
-import { normalizeLimit } from "./options";
-import type { NewsItem, NewsKind, NewsProvider } from "./types";
+import { cleanText, decodeEntities, stableId, stripCdata } from "./text.js";
+import { normalizeLimit } from "./options.js";
+import type { NewsItem, NewsKind, NewsProvider } from "./types.js";
 
 export interface RssParseOptions {
   provider: NewsProvider;

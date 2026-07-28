@@ -1,7 +1,7 @@
-import { fetchText } from "../http";
-import { normalizeDateWindow, normalizeLimit, type DateWindow } from "../options";
-import { cleanText, decodeEntities, stableId } from "../text";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { normalizeDateWindow, normalizeLimit, type DateWindow } from "../options.js";
+import { cleanText, decodeEntities, stableId } from "../text.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /** Options for YouTube channel-feed fetches. */
 export interface YoutubeFeedOptions extends SourceFetchOptions {

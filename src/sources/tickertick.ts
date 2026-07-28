@@ -1,9 +1,15 @@
-import { fetchText } from "../http";
-import { numberField, parseJsonRecord, recordArray, stringArrayField, stringField } from "../json";
-import { normalizeLimit } from "../options";
-import { stableId } from "../text";
-import { inferNewsKind } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import {
+  numberField,
+  parseJsonRecord,
+  recordArray,
+  stringArrayField,
+  stringField,
+} from "../json.js";
+import { normalizeLimit } from "../options.js";
+import { stableId } from "../text.js";
+import { inferNewsKind } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /**
  * TickerTick API (https://github.com/hczhu/TickerTick-API): free, keyless,

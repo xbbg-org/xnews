@@ -33,7 +33,7 @@ import {
   subjectMatcher,
   youtubeChannelFeedUrl,
   youtubeWatchUrl,
-} from "../src";
+} from "../src/index.js";
 import {
   bingRssFixture,
   courtListenerAtomFixture,
@@ -59,7 +59,7 @@ import {
   youtubeSrv3TranscriptFixture,
   youtubeTranscriptXmlFixture,
   youtubeWatchPageFixture,
-} from "./fixtures";
+} from "./fixtures.js";
 
 function fetchInputUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;

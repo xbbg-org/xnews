@@ -2,7 +2,7 @@ import type {
   RealtimeAsrEvent,
   RealtimeAsrSessionOptions,
   TranscribePcmStreamOptions,
-} from "./types";
+} from "./types.js";
 
 /**
  * Transcribes a finite or live stream of mono 16 kHz s16le PCM frames.

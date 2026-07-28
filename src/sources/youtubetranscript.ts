@@ -1,7 +1,7 @@
-import { fetchText, postJson } from "../http";
-import { isRecord, recordArray, stringField } from "../json";
-import { cleanText } from "../text";
-import type { SourceFetchOptions } from "../types";
+import { fetchText, postJson } from "../http.js";
+import { isRecord, recordArray, stringField } from "../json.js";
+import { cleanText } from "../text.js";
+import type { SourceFetchOptions } from "../types.js";
 
 /** Options for transcript fetches. */
 export interface YoutubeTranscriptOptions extends SourceFetchOptions {

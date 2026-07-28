@@ -1,6 +1,6 @@
-import { fetchText } from "../http";
-import { parseRssItems } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseRssItems } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 export function nasdaqRssUrl(ticker: string): string {
   const url = new URL("https://www.nasdaq.com/feed/rssoutbound");

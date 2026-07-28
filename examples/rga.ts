@@ -1,4 +1,4 @@
-import { buildCompanyNewsFeed, buildNewsFeedResult, createNewsWatcher } from "../src";
+import { buildCompanyNewsFeed, buildNewsFeedResult, createNewsWatcher } from "../src/index.js";
 
 const feed = await buildCompanyNewsFeed({
   ticker: "RGA",

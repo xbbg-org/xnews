@@ -1,6 +1,6 @@
-import { fetchText } from "../http";
-import { parseRssItems } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseRssItems } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 export function seekingAlphaRssUrl(ticker: string): string {
   return `https://seekingalpha.com/api/sa/combined/${encodeURIComponent(ticker.toUpperCase())}.xml`;

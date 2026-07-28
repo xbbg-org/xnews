@@ -1,23 +1,23 @@
-import { classifyMarketEvent } from "./classify";
-import { normalizeDateWindow, normalizeLimit, type DateWindow } from "./options";
-import { fetchBingNews, bingNewsRssUrl } from "./sources/bing";
-import { fetchCourtListenerNews, courtListenerSearchUrl } from "./sources/courtlistener";
-import { fetchFederalRegisterNews, federalRegisterSearchUrl } from "./sources/federalregister";
-import { fetchFinvizNews, finvizQuoteUrl } from "./sources/finviz";
-import { FIXED_FEEDS, fetchFixedFeedNews, isFixedFeedProvider } from "./sources/fixedfeeds";
-import { fetchGdeltNews, gdeltDocUrl } from "./sources/gdelt";
-import { fetchGoogleNews, googleNewsRssUrl } from "./sources/google";
-import { fetchHackerNewsStories, hackerNewsSearchUrl } from "./sources/hackernews";
-import type { SubjectMatchTerms } from "./sources/match";
-import { fetchMsrbEmmaDisclosures, msrbEmmaCdUrl, msrbEmmaPeriods } from "./sources/msrbemma";
-import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq";
-import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec";
-import { fetchSecCurrentFilings, secCurrentAtomUrl } from "./sources/seccurrent";
-import { fetchSecFullTextFilings, secFullTextSearchUrl } from "./sources/secfulltext";
-import { fetchSeekingAlphaNews, seekingAlphaRssUrl } from "./sources/seekingalpha";
-import { fetchTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick";
-import { fetchYahooFinanceNews, yahooFinanceRssUrl } from "./sources/yahoo";
-import { fetchYahooSearchNews, yahooSearchUrl } from "./sources/yahoosearch";
+import { classifyMarketEvent } from "./classify.js";
+import { normalizeDateWindow, normalizeLimit, type DateWindow } from "./options.js";
+import { fetchBingNews, bingNewsRssUrl } from "./sources/bing.js";
+import { fetchCourtListenerNews, courtListenerSearchUrl } from "./sources/courtlistener.js";
+import { fetchFederalRegisterNews, federalRegisterSearchUrl } from "./sources/federalregister.js";
+import { fetchFinvizNews, finvizQuoteUrl } from "./sources/finviz.js";
+import { FIXED_FEEDS, fetchFixedFeedNews, isFixedFeedProvider } from "./sources/fixedfeeds.js";
+import { fetchGdeltNews, gdeltDocUrl } from "./sources/gdelt.js";
+import { fetchGoogleNews, googleNewsRssUrl } from "./sources/google.js";
+import { fetchHackerNewsStories, hackerNewsSearchUrl } from "./sources/hackernews.js";
+import type { SubjectMatchTerms } from "./sources/match.js";
+import { fetchMsrbEmmaDisclosures, msrbEmmaCdUrl, msrbEmmaPeriods } from "./sources/msrbemma.js";
+import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq.js";
+import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec.js";
+import { fetchSecCurrentFilings, secCurrentAtomUrl } from "./sources/seccurrent.js";
+import { fetchSecFullTextFilings, secFullTextSearchUrl } from "./sources/secfulltext.js";
+import { fetchSeekingAlphaNews, seekingAlphaRssUrl } from "./sources/seekingalpha.js";
+import { fetchTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick.js";
+import { fetchYahooFinanceNews, yahooFinanceRssUrl } from "./sources/yahoo.js";
+import { fetchYahooSearchNews, yahooSearchUrl } from "./sources/yahoosearch.js";
 import type {
   CompanyNewsQuery,
   CompanyNewsSubjectInput,
@@ -38,7 +38,7 @@ import type {
   WatchlistNewsQuery,
   WatchNewsOptions,
   WatchTopicNewsOptions,
-} from "./types";
+} from "./types.js";
 
 const DEFAULT_COMPANY_SOURCES: readonly NewsProvider[] = [
   "sec-edgar",

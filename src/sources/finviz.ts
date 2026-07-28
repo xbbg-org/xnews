@@ -1,7 +1,7 @@
-import { fetchText } from "../http";
-import { normalizeLimit } from "../options";
-import { cleanText, stableId, toAbsoluteUrl } from "../text";
-import type { NewsItem, NewsKind, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { normalizeLimit } from "../options.js";
+import { cleanText, stableId, toAbsoluteUrl } from "../text.js";
+import type { NewsItem, NewsKind, SourceFetchOptions } from "../types.js";
 
 const FINVIZ_BASE_URL = "https://finviz.com";
 

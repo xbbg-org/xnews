@@ -1,6 +1,6 @@
-import { fetchText } from "../http";
-import { parseRssItems } from "../xml";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseRssItems } from "../xml.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 export function yahooFinanceRssUrl(ticker: string, region = "US", lang = "en-US"): string {
   const url = new URL("https://feeds.finance.yahoo.com/rss/2.0/headline");

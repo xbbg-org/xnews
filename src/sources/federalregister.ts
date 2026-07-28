@@ -1,8 +1,8 @@
-import { fetchText } from "../http";
-import { parseJsonRecord, recordArray, stringField } from "../json";
-import { normalizeLimit } from "../options";
-import { stableId } from "../text";
-import type { NewsItem, SourceFetchOptions } from "../types";
+import { fetchText } from "../http.js";
+import { parseJsonRecord, recordArray, stringField } from "../json.js";
+import { normalizeLimit } from "../options.js";
+import { stableId } from "../text.js";
+import type { NewsItem, SourceFetchOptions } from "../types.js";
 
 /** Federal Register API (https://www.federalregister.gov/developers/documentation/api/v1). */
 export function federalRegisterSearchUrl(
