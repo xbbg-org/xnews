@@ -3,28 +3,14 @@ import { normalizeLimit } from "../options.js";
 import { parseAtomEntries } from "../xml.js";
 import { subjectMatcher } from "./match.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
+import { secCurrentAtomUrl } from "./seccurrent.urls.js";
+export { secCurrentAtomUrl } from "./seccurrent.urls.js";
 
 interface SecCurrentFetchOptions extends SourceFetchOptions {
   forms?: readonly string[];
   ticker?: string;
   /** Local all-token filter applied to entry titles and summaries. */
   filterQuery?: string;
-}
-
-/**
- * SEC EDGAR "Latest Filings" (current events) Atom feed: the market-wide
- * stream of filings as they arrive. `company` is EDGAR's server-side
- * company-name prefix search over the current window; omit it for the
- * unfiltered stream.
- */
-export function secCurrentAtomUrl(company?: string, formType?: string, count = 40): string {
-  const url = new URL("https://www.sec.gov/cgi-bin/browse-edgar");
-  url.searchParams.set("action", "getcurrent");
-  if (company) url.searchParams.set("company", company);
-  if (formType) url.searchParams.set("type", formType);
-  url.searchParams.set("count", String(Math.min(count, 100)));
-  url.searchParams.set("output", "atom");
-  return url.toString();
 }
 
 export async function fetchSecCurrentFilings(

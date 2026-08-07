@@ -1,4 +1,5 @@
 import { classifyMarketEvent } from "./classify.js";
+import { XnewsFetchError } from "./http.js";
 import { normalizeDateWindow, normalizeLimit, type DateWindow } from "./options.js";
 import { fetchBingNews, bingNewsRssUrl } from "./sources/bing.js";
 import { fetchCourtListenerNews, courtListenerSearchUrl } from "./sources/courtlistener.js";
@@ -272,14 +273,14 @@ async function fetchProviderResult(
   const requestUrls = providerRequestUrls(provider, subject, query);
   try {
     const sourceItems = await fetchSource(provider, subject, query, dateWindow);
-    const items = filterItemsByDateWindow(sourceItems, dateWindow).map((item) =>
-      annotateNewsItem(item, subject),
-    );
+    const windowed = filterItemsByDateWindow(sourceItems, dateWindow);
+    const items = windowed.items.map((item) => annotateNewsItem(item, subject));
     return providerResult({
       provider,
       capabilities,
       status: items.length > 0 ? "ok" : "empty",
       items,
+      undatedExcluded: windowed.undatedExcluded,
       warnings: [],
       startedAt,
       requestUrls,
@@ -289,7 +290,10 @@ async function fetchProviderResult(
     return providerResult({
       provider,
       capabilities,
-      status: "error",
+      // A config precondition (SEC User-Agent, EMMA terms) is the caller's
+      // decision, not a transport failure: the provider is disabled until the
+      // caller supplies it.
+      status: providerError.code === "config" ? "disabled" : "error",
       items: [],
       warnings: [`${provider}: ${providerError.message}`],
       startedAt,
@@ -304,6 +308,7 @@ function providerResult(options: {
   readonly capabilities: readonly NewsProviderCapability[];
   readonly status: ProviderResult["status"];
   readonly items: readonly NewsItem[];
+  readonly undatedExcluded?: number;
   readonly warnings: readonly string[];
   readonly startedAt: number;
   readonly requestUrls: readonly string[];
@@ -315,6 +320,7 @@ function providerResult(options: {
     capabilities: options.capabilities,
     itemCount: options.items.length,
     items: options.items,
+    undatedExcluded: options.undatedExcluded ?? 0,
     warnings: options.warnings,
     fetchedAt: new Date().toISOString(),
     durationMs: Date.now() - options.startedAt,
@@ -324,7 +330,15 @@ function providerResult(options: {
 }
 
 function providerErrorFromUnknown(error: unknown): ProviderError {
-  return { message: error instanceof Error ? error.message : String(error) };
+  if (error instanceof XnewsFetchError) {
+    return {
+      message: error.message,
+      code: error.code,
+      ...(error.status !== undefined ? { status: error.status } : {}),
+      url: error.url,
+    };
+  }
+  return { message: error instanceof Error ? error.message : String(error), code: "unknown" };
 }
 
 async function fetchSource(
@@ -448,15 +462,26 @@ function providerRequestUrls(
   return [finvizQuoteUrl(requiredTicker(provider, subject))];
 }
 
-function filterItemsByDateWindow(items: readonly NewsItem[], window: DateWindow): NewsItem[] {
-  if (!hasDateWindowBounds(window)) return [...items];
-  return items.filter((item) => {
-    if (!item.publishedAt) return false;
+function filterItemsByDateWindow(
+  items: readonly NewsItem[],
+  window: DateWindow,
+): { readonly items: NewsItem[]; readonly undatedExcluded: number } {
+  if (!hasDateWindowBounds(window)) return { items: [...items], undatedExcluded: 0 };
+  let undatedExcluded = 0;
+  const kept = items.filter((item) => {
+    if (!item.publishedAt) {
+      undatedExcluded += 1;
+      return false;
+    }
     const publishedAtMs = Date.parse(item.publishedAt);
-    if (!Number.isFinite(publishedAtMs)) return false;
+    if (!Number.isFinite(publishedAtMs)) {
+      undatedExcluded += 1;
+      return false;
+    }
     if (window.sinceMs !== undefined && publishedAtMs < window.sinceMs) return false;
     return window.untilMs === undefined || publishedAtMs <= window.untilMs;
   });
+  return { items: kept, undatedExcluded };
 }
 
 function annotateNewsItem(item: NewsItem, subject: NewsSubject): NewsItem {

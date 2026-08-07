@@ -43,6 +43,20 @@ export type NewsProviderCapability = "company" | "topic" | "filing";
 
 export type ProviderStatus = "ok" | "empty" | "unsupported" | "partial" | "error" | "disabled";
 
+/**
+ * Machine-readable classification for transport failures. `config` marks a
+ * policy precondition that failed before any network I/O (missing SEC
+ * User-Agent, EMMA terms not accepted, no fetch implementation); `unknown`
+ * marks errors that did not originate in this library's transport.
+ */
+export type ProviderErrorCode =
+  | "config"
+  | "network"
+  | "http_status"
+  | "timeout"
+  | "aborted"
+  | "unknown";
+
 export type MarketEventKind =
   | "filing"
   | "earnings"
@@ -125,8 +139,20 @@ export interface SourceFetchOptions {
   readonly fetch?: SourceFetch;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  /**
+   * Redirect semantics enforced by xnews. `"follow"` (default) revalidates
+   * policy on at most ten hops; the injected fetch receives `"manual"`.
+   */
+  readonly redirect?: RequestRedirect;
   readonly userAgent?: string;
   readonly secUserAgent?: string;
+  /**
+   * MSRB EMMA gates data behind a Terms-of-Use acceptance cookie. Accepting
+   * those terms (https://emma.msrb.org) is the caller's act: without this
+   * flag, EMMA requests fail closed with a `config` error instead of the
+   * library accepting on the caller's behalf.
+   */
+  readonly msrbAcceptTermsOfUse?: boolean;
   readonly limit?: number;
   readonly since?: string | Date;
   readonly until?: string | Date;
@@ -160,6 +186,8 @@ export interface WatchTopicNewsOptions extends TopicNewsQuery {
 
 export interface ProviderError {
   readonly message: string;
+  /** Machine-readable classification; `unknown` for non-transport failures. */
+  readonly code?: ProviderErrorCode;
   readonly status?: number;
   readonly url?: string;
 }
@@ -170,6 +198,13 @@ export interface ProviderResult {
   readonly capabilities: readonly NewsProviderCapability[];
   readonly itemCount: number;
   readonly items: readonly NewsItem[];
+  /**
+   * Items dropped by a `since`/`until` window because they carry no parseable
+   * publication date. Library-generated results always include this count;
+   * the field remains optional so 0.1.x consumer-defined result fixtures stay
+   * assignable to this public interface.
+   */
+  readonly undatedExcluded?: number;
   readonly warnings: readonly string[];
   readonly fetchedAt: string;
   readonly durationMs: number;

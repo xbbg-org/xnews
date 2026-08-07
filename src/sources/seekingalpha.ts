@@ -1,19 +1,19 @@
-import { fetchText } from "../http.js";
+import { BROWSERISH_USER_AGENT, fetchText } from "../http.js";
 import { parseRssItems } from "../xml.js";
+import { seekingAlphaRssUrl } from "./seekingalpha.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
 
-export function seekingAlphaRssUrl(ticker: string): string {
-  return `https://seekingalpha.com/api/sa/combined/${encodeURIComponent(ticker.toUpperCase())}.xml`;
-}
+export { seekingAlphaRssUrl } from "./seekingalpha.urls.js";
 
 export async function fetchSeekingAlphaNews(
   ticker: string,
   options: SourceFetchOptions = {},
 ): Promise<NewsItem[]> {
-  const xml = await fetchText(seekingAlphaRssUrl(ticker), {
-    ...options,
-    userAgent: options.userAgent ?? "Mozilla/5.0 xnews/0.1.0",
-  });
+  const xml = await fetchText(
+    seekingAlphaRssUrl(ticker),
+    options,
+    options.userAgent ?? BROWSERISH_USER_AGENT,
+  );
   return parseSeekingAlphaNews(xml, ticker, options.limit);
 }
 

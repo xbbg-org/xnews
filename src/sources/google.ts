@@ -1,6 +1,9 @@
 import { fetchText } from "../http.js";
 import { parseRssItems } from "../xml.js";
+import { googleNewsRssUrl } from "./google.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
+
+export { googleNewsRssUrl } from "./google.urls.js";
 
 export interface GoogleNewsOptions extends SourceFetchOptions {
   ticker?: string;
@@ -9,15 +12,6 @@ export interface GoogleNewsOptions extends SourceFetchOptions {
 export interface GoogleNewsParseOptions {
   limit?: number;
   ticker?: string;
-}
-
-export function googleNewsRssUrl(query: string, region = "US", lang = "en-US"): string {
-  const url = new URL("https://news.google.com/rss/search");
-  url.searchParams.set("q", query);
-  url.searchParams.set("hl", lang);
-  url.searchParams.set("gl", region);
-  url.searchParams.set("ceid", `${region}:en`);
-  return url.toString();
 }
 
 export async function fetchGoogleNews(

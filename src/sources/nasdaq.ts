@@ -1,21 +1,19 @@
-import { fetchText } from "../http.js";
+import { BROWSERISH_USER_AGENT, fetchText } from "../http.js";
 import { parseRssItems } from "../xml.js";
+import { nasdaqRssUrl } from "./nasdaq.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
 
-export function nasdaqRssUrl(ticker: string): string {
-  const url = new URL("https://www.nasdaq.com/feed/rssoutbound");
-  url.searchParams.set("symbol", ticker.toUpperCase());
-  return url.toString();
-}
+export { nasdaqRssUrl } from "./nasdaq.urls.js";
 
 export async function fetchNasdaqNews(
   ticker: string,
   options: SourceFetchOptions = {},
 ): Promise<NewsItem[]> {
-  const xml = await fetchText(nasdaqRssUrl(ticker), {
-    ...options,
-    userAgent: options.userAgent ?? "Mozilla/5.0 xnews/0.1.0",
-  });
+  const xml = await fetchText(
+    nasdaqRssUrl(ticker),
+    options,
+    options.userAgent ?? BROWSERISH_USER_AGENT,
+  );
   return parseNasdaqNews(xml, ticker, options.limit);
 }
 

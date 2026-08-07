@@ -18,6 +18,12 @@ bun add @xbbg/xnews
 
 Requires Node 24 or newer. The package is **ESM-only**: it exports ESM from `dist/index.js` with TypeScript declarations at `dist/index.d.ts`, and has no CommonJS build. CommonJS callers must use a dynamic `import()`.
 
+## Subpath exports
+
+- `@xbbg/xnews/catalog` exports URL builders, `FIXED_FEEDS`, and `PROVIDER_POLICIES`. It is structurally network-free: its import graph never reaches the fetch layer.
+- `@xbbg/xnews/parsers` exports pure parsers.
+- `@xbbg/xnews/asr` exports transcription APIs.
+
 ## Company feed
 
 ```ts
@@ -93,6 +99,8 @@ These providers query their upstream endpoint per subject.
 
 `since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`) and always enforced locally after fetching. `msrb-emma` maps `since` onto EMMA's fixed posting windows: it fetches Today+Yesterday by default and widens to ThisWeek/LastWeek (EMMA's maximum lookback) when the window reaches further back.
 
+Using `msrb-emma` requires `msrbAcceptTermsOfUse: true`. Setting the flag records the caller's acceptance of EMMA's Terms of Use.
+
 ### Fixed market and business feeds
 
 These providers fetch whole public feeds and filter items locally against the subject: topic queries require every query token; company subjects match the company name as a phrase or the ticker as a standalone uppercase token (`RGA`, `$RGA`, `NYSE:RGA`). Single-letter tickers only match with cashtag or exchange context. An `"empty"` status usually means the current headlines simply do not mention the subject.
@@ -148,9 +156,29 @@ const topic = await buildNewsFeedResult({
 
 Supported subject kinds are `"company"` and `"topic"`. Market-intelligence subjects such as macro, sector, fund, index, or region should be represented as `kind: "topic"` queries until a consuming application needs different provider behavior.
 
-Date windows are inclusive. When `since` or `until` is present, items with missing or unparseable `publishedAt` are dropped after fetching and before the final merged limit is applied.
+### Dates
+
+`NewsItem.publishedAt` is an ISO 8601 UTC instant derived from `publishedAtText` by the versioned parser identified by `PUBLISHED_AT_PARSER_VERSION`. Store `publishedAtText` unchanged so dates can be re-derived after parser fixes.
+
+Date windows are inclusive. When `since` or `until` is present, items with missing or unparseable dates are excluded fail-closed after fetching and before the final merged limit is applied. `ProviderResult.undatedExcluded` counts those items.
 
 `eventKind` and `tags` are optional deterministic hints derived from titles, summaries, source names, forms, and URLs. They are not investment advice, sentiment, materiality scoring, or a substitute for provider diagnostics.
+
+### Errors
+
+Transport failures throw `XnewsFetchError` with a machine-readable `code`:
+
+- `config`: required provider configuration is missing or invalid.
+- `network`: the transport failed before returning a response.
+- `http_status`: the upstream returned a non-success HTTP status.
+- `timeout`: the request exceeded `timeoutMs`.
+- `aborted`: the caller aborted the request.
+
+Provider warnings and errors include the effective request URL after removing credentials and redacting sensitive query values. In feed results, `config` failures surface with provider status `"disabled"`.
+
+### Item identity
+
+`NewsItem.id` is derived from `provider|guid-or-link|title`. Provider-specific variants may use a stronger identifier; SEC uses the accession number when present. `NEWS_ITEM_ID_SCHEME_VERSION` versions this derivation.
 
 ## Watchlist feed
 
@@ -257,34 +285,35 @@ Every session emits one sequenced `ready` status before transcript events. Break
 
 The OpenRouter backend always sends credentials only to the official `https://openrouter.ai` origin. Its optional `responseFormat` is limited to `"json"` or `"verbose_json"`; `timestampGranularities` requires `"verbose_json"`. Injected `fetch` remains available for testing, metering, and transport policy without changing the credential destination.
 
-## Injected fetch, proxy, timeout, and abort
+## Transport
 
-All providers use the injected `fetch` through `fetchText`. Consumers can pass proxy-aware, retrying, metered, or test fetchers without changing parser code.
+xnews never opens a connection except through `options.fetch`, which defaults to `globalThis.fetch`. All source traffic flows through one internal chokepoint. Headers added by xnews are visible in the `RequestInit` received by the injected fetch.
+
+`SourceFetchOptions.redirect` defaults to `"follow"`. xnews follows at most ten hops itself and re-applies URL, SEC identity, and EMMA consent policy before each connection; the injected fetch therefore receives `redirect: "manual"` for every hop. `"manual"` and `"error"` refuse to follow. Consumers still own DNS resolution and address policy: inject a governed transport for SSRF pinning, robots policy, or rate limits. Proxy-aware, retrying, metered, and test fetchers require no parser changes.
 
 ```ts
 const result = await buildCompanyNewsFeedResult({
   ticker: "RGA",
   fetch: proxyAwareFetch,
+  redirect: "follow",
   timeoutMs: 20_000,
   signal: abortController.signal,
 });
 ```
 
-`timeoutMs` is enforced by the package around each HTTP request. `signal` aborts pending fetches and watchers.
+`timeoutMs` covers the complete request and redirect chain. `signal` aborts pending fetches and watchers.
 
 ## SEC user agent
 
-SEC requests should pass a real `secUserAgent` identifying the consuming app and contact, for example:
+`secUserAgent` is required for requests to `sec.gov` and its subdomains; the shared caller-supplied `userAgent` satisfies the requirement when `secUserAgent` is omitted. Values are trimmed and blank/control-character values fail before network I/O. Use a value that identifies the consuming app and a real contact:
 
 ```ts
 await buildCompanyNewsFeedResult({
   ticker: "RGA",
   secForms: ["8-K", "10-Q"],
-  secUserAgent: "my-app/1.0 ops@example.com",
+  secUserAgent: "myapp/1.0 ops@example.com",
 });
 ```
-
-The package keeps a default SEC user agent for compatibility, but production callers should provide their own.
 
 ## Source limitations
 

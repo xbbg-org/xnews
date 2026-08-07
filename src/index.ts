@@ -13,6 +13,7 @@ export type {
   NewsSubject,
   NewsSubjectInput,
   ProviderError,
+  ProviderErrorCode,
   ProviderResult,
   ProviderStatus,
   SourceFetchOptions,
@@ -25,6 +26,14 @@ export type {
   WatchNewsOptions,
   WatchTopicNewsOptions,
 } from "./types.js";
+
+export type { ParsedPublishedAt, PublishedAtFormat } from "./dates.js";
+export type { ProviderPolicy } from "./catalog.js";
+
+export { PROVIDER_POLICIES } from "./catalog.js";
+export { PUBLISHED_AT_PARSER_VERSION, parsePublishedAt } from "./dates.js";
+export { XnewsFetchError } from "./http.js";
+export { NEWS_ITEM_ID_SCHEME_VERSION } from "./text.js";
 
 export type { MoonshineAsrOptions, MoonshineModelArch } from "./asr/moonshine.js";
 export type {

@@ -1,37 +1,11 @@
+import { parsePublishedAt } from "../dates.js";
 import { fetchText } from "../http.js";
 import { isRecord, parseJsonRecord, recordArray, stringArrayField, stringField } from "../json.js";
 import { normalizeLimit } from "../options.js";
 import { stableId } from "../text.js";
-import type { NewsItem, SourceFetchOptions } from "../types.js";
-
-interface SecFullTextOptions extends SourceFetchOptions {
-  forms?: readonly string[];
-  ticker?: string;
-}
-
-/** SEC EDGAR full-text search (https://efts.sec.gov/LATEST/search-index?q=...). */
-export function secFullTextSearchUrl(
-  query: string,
-  options: Pick<SecFullTextOptions, "forms" | "since" | "until" | "ticker"> = {},
-): string {
-  const url = new URL("https://efts.sec.gov/LATEST/search-index");
-  url.searchParams.set("q", `"${query.replace(/"/g, "")}"`);
-  if (options.ticker) {
-    // EFTS resolves tickers and company names to an entity server-side; a
-    // bare CIK number matches only in its zero-padded ten-digit form.
-    const entity = options.ticker.trim();
-    url.searchParams.set("entityName", /^\d+$/.test(entity) ? entity.padStart(10, "0") : entity);
-  }
-  if (options.forms?.length) url.searchParams.set("forms", options.forms.join(","));
-  const since = toDateOnly(options.since);
-  const until = toDateOnly(options.until);
-  if (since || until) {
-    url.searchParams.set("dateRange", "custom");
-    if (since) url.searchParams.set("startdt", since);
-    if (until) url.searchParams.set("enddt", until);
-  }
-  return url.toString();
-}
+import type { NewsItem } from "../types.js";
+import { secFullTextSearchUrl, type SecFullTextOptions } from "./secfulltext.urls.js";
+export { secFullTextSearchUrl } from "./secfulltext.urls.js";
 
 export async function fetchSecFullTextFilings(
   query: string,
@@ -86,7 +60,7 @@ export function parseSecFullTextFilings(
     const xsl = stringField(source, "xsl")?.trim();
     const url = `https://www.sec.gov/Archives/edgar/data/${cik}/${adsh.replace(/-/g, "")}/${xsl ? `${xsl}/` : ""}${fileName}`;
     const fileDate = stringField(source, "file_date");
-    const publishedAt = fileDate ? toIso(fileDate) : undefined;
+    const publishedAt = fileDate ? parsePublishedAt(fileDate)?.instant : undefined;
 
     items.push({
       id: stableId(["sec-fulltext", adsh, fileName]),
@@ -109,15 +83,4 @@ export function parseSecFullTextFilings(
     if (limit !== undefined && items.length >= limit) break;
   }
   return items;
-}
-
-function toIso(value: string): string | undefined {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
-function toDateOnly(value: string | Date | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
 }

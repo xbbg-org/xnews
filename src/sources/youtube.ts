@@ -1,16 +1,15 @@
-import { fetchText } from "../http.js";
+import { parsePublishedAt } from "../dates.js";
+import { BROWSERISH_USER_AGENT, fetchText } from "../http.js";
 import { normalizeDateWindow, normalizeLimit, type DateWindow } from "../options.js";
-import { cleanText, decodeEntities, stableId } from "../text.js";
+import { cleanText, decodeEntities, safeHttpUrl, stableId } from "../text.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
-
-/** Options for YouTube channel-feed fetches. */
-export interface YoutubeFeedOptions extends SourceFetchOptions {
-  /**
-   * Fetch the channel's long-form uploads playlist instead of the full
-   * channel feed, excluding Shorts at the feed level. Defaults to false.
-   */
-  readonly hideShorts?: boolean;
-}
+import {
+  youtubeChannelFeedUrl,
+  youtubeChannelPageUrl,
+  type YoutubeFeedOptions,
+} from "./youtube.urls.js";
+export { youtubeChannelFeedUrl } from "./youtube.urls.js";
+export type { YoutubeFeedOptions } from "./youtube.urls.js";
 
 /** Per-channel outcome of a subscription fetch. */
 export interface YoutubeChannelResult {
@@ -31,8 +30,6 @@ export interface YoutubeSubscriptionsResult {
   readonly partial: boolean;
 }
 
-const YOUTUBE_FEED_BASE = "https://www.youtube.com/feeds/videos.xml";
-const BROWSERISH_USER_AGENT = "Mozilla/5.0 xnews/0.1.0";
 const CHANNEL_ID_PATTERN = /^UC[0-9A-Za-z_-]{16,}$/;
 const CHANNEL_URL_ID_PATTERN = /youtube\.com\/channel\/(UC[0-9A-Za-z_-]{16,})/i;
 const PAGE_CHANNEL_ID_PATTERN =
@@ -40,23 +37,6 @@ const PAGE_CHANNEL_ID_PATTERN =
 
 export function isYoutubeChannelId(value: string): boolean {
   return CHANNEL_ID_PATTERN.test(value);
-}
-
-/**
- * YouTube's public per-channel Atom feed: free and keyless, returns the ~15
- * most recent uploads. With `hideShorts` the `UC…` channel ID is swapped for
- * the channel's `UULF…` long-form uploads playlist, which excludes Shorts.
- * The endpoint intermittently returns 404 for every channel during certain
- * hours; that is an upstream outage, not a bad channel ID.
- */
-export function youtubeChannelFeedUrl(
-  channelId: string,
-  options: { hideShorts?: boolean } = {},
-): string {
-  if (options.hideShorts && channelId.startsWith("UC")) {
-    return `${YOUTUBE_FEED_BASE}?playlist_id=${encodeURIComponent(`UULF${channelId.slice(2)}`)}`;
-  }
-  return `${YOUTUBE_FEED_BASE}?channel_id=${encodeURIComponent(channelId)}`;
 }
 
 /**
@@ -73,14 +53,10 @@ export async function resolveYoutubeChannelId(
   if (!trimmed) throw new Error("YouTube channel is required");
   if (isYoutubeChannelId(trimmed)) return trimmed;
 
-  const fromUrl = trimmed.match(CHANNEL_URL_ID_PATTERN)?.[1];
-  if (fromUrl) return fromUrl;
-
   const pageUrl = youtubeChannelPageUrl(trimmed);
-  const html = await fetchText(
-    pageUrl,
-    options.userAgent ? options : { ...options, userAgent: BROWSERISH_USER_AGENT },
-  );
+  const fromUrl = pageUrl.match(CHANNEL_URL_ID_PATTERN)?.[1];
+  if (fromUrl) return fromUrl;
+  const html = await fetchText(pageUrl, options, options.userAgent ?? BROWSERISH_USER_AGENT);
   const resolved =
     html.match(CHANNEL_URL_ID_PATTERN)?.[1] ?? html.match(PAGE_CHANNEL_ID_PATTERN)?.[1];
   if (!resolved) {
@@ -145,7 +121,8 @@ export function parseYoutubeChannelVideos(xml: string, limit?: number): NewsItem
       readAlternateLink(block) || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : "");
     if (!title || !link) continue;
 
-    const url = decodeEntities(link);
+    const url = safeHttpUrl(decodeEntities(link));
+    if (url === undefined) continue;
     const channelName = cleanText(readTag(block, "name"));
     const published =
       cleanText(readTag(block, "published")) || cleanText(readTag(block, "updated"));
@@ -200,17 +177,8 @@ async function fetchChannelItems(
 ): Promise<NewsItem[]> {
   const channelId = await resolveYoutubeChannelId(channel, options);
   const feedUrl = youtubeChannelFeedUrl(channelId, options);
-  const xml = await fetchText(
-    feedUrl,
-    options.userAgent ? options : { ...options, userAgent: BROWSERISH_USER_AGENT },
-  );
+  const xml = await fetchText(feedUrl, options, options.userAgent ?? BROWSERISH_USER_AGENT);
   return filterByDateWindow(parseYoutubeChannelVideos(xml), window);
-}
-
-function youtubeChannelPageUrl(channel: string): string {
-  if (/^https?:\/\//i.test(channel)) return channel;
-  const handle = channel.startsWith("@") ? channel : `@${channel}`;
-  return `https://www.youtube.com/${handle}`;
 }
 
 function filterByDateWindow(items: readonly NewsItem[], window: DateWindow): NewsItem[] {
@@ -254,7 +222,5 @@ function readAlternateLink(block: string): string {
 }
 
 function toIsoDate(value: string): string | undefined {
-  if (!value) return undefined;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+  return value ? parsePublishedAt(value)?.instant : undefined;
 }

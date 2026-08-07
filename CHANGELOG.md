@@ -7,10 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- `sec.gov` requests now fail closed with a `config` error unless `secUserAgent` or `userAgent` is set. SEC's fair-access policy requires a declared contact; the old `contact@example.com` default impersonated one.
+- MSRB EMMA requests now require explicit `msrbAcceptTermsOfUse: true`. Accepting EMMA's Terms of Use is now the caller's recorded act.
+- Transport failures now throw typed `XnewsFetchError` values with a machine-readable `code` (`config | network | http_status | timeout | aborted`). Provider warnings and errors include a credential- and sensitive-query-redacted effective URL.
+
 ### Added
 
+- Added `./catalog`, `./parsers`, and `./asr` subpath exports. `@xbbg/xnews/catalog` is structurally network-free: its import graph never reaches the fetch layer.
+- Added `parsePublishedAt` and `PUBLISHED_AT_PARSER_VERSION`. RSS/Atom and provider-native Finviz, GDELT, and EMMA dates now use one versioned derivation; invalid explicit dates fail closed, missing zones or offsets are read as UTC, and unknown formats are tagged `engine`.
+- Added `ProviderResult.undatedExcluded` to report items dropped by a `since` or `until` window because they lack a parseable date.
+- Added `ProviderError.code` and `SourceFetchOptions.redirect`; `"follow"` defaults to at most ten policy-checked hops while the injected fetch receives `"manual"` for each hop.
+- `FIXED_FEEDS` entries now carry `suggestedMinPollSeconds`; new `PROVIDER_POLICIES` records capture per-provider operational facts, including SEC's 10 requests/second limit and declared-user-agent requirement and EMMA's terms; new `NEWS_ITEM_ID_SCHEME_VERSION` documents the `provider|guid-or-link|title` item ID derivation.
 - `bun run release <patch|minor|major|X.Y.Z>` cuts a release: it verifies the checkout is clean and synced, runs the quality and packaged-install gates, bumps the manifest, promotes `[Unreleased]` to a dated section with fresh compare links, commits, and writes an annotated tag whose message is the release notes. `--dry-run` validates without changing anything.
 - `npm-publish.yml` now cuts the GitHub release from the matching `CHANGELOG.md` section, so the tag, the npm tarball, and the GitHub release notes cannot drift apart.
+
+### Changed
+
+- Default User-Agent strings no longer embed the package version, which could drift.
 
 ## [0.1.1] - 2026-07-28
 

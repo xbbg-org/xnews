@@ -183,6 +183,7 @@ test("buildCompanyNewsFeed can run against injected source fetchers", async () =
     ticker: "RGA",
     companyName: "Reinsurance Group of America",
     sources: ["yahoo-finance", "sec-edgar", "finviz"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     fetch: async (input) => {
       const href = fetchInputUrl(input);
       if (href.includes("feeds.finance.yahoo.com")) return new Response(yahooRssFixture);
@@ -235,12 +236,16 @@ test("buildTopicNewsFeedResult reports Google warnings while lenient topic feed 
   });
 
   expect(failingResult.items).toEqual([]);
-  expect(failingResult.warnings).toEqual(["google-news: google unavailable"]);
+  expect(failingResult.warnings).toEqual([
+    "google-news: GET https://news.google.com/rss/search?q=insurance+regulation&hl=en-US&gl=US&ceid=US%3Aen failed: network request failed",
+  ]);
   expect(failingResult.providers).toHaveLength(1);
   expect(failingResult.providers[0]).toMatchObject({
     provider: "google-news",
     items: [],
-    warnings: ["google-news: google unavailable"],
+    warnings: [
+      "google-news: GET https://news.google.com/rss/search?q=insurance+regulation&hl=en-US&gl=US&ceid=US%3Aen failed: network request failed",
+    ],
   });
 
   const feed = await buildTopicNewsFeed({
@@ -302,7 +307,9 @@ test("partial provider failures return successful items and result warnings", as
   const result = await buildCompanyNewsFeedResult(query);
   expect(result.items).toHaveLength(1);
   expect(result.items[0]?.provider).toBe("yahoo-finance");
-  expect(result.warnings).toEqual(["finviz: finviz unavailable"]);
+  expect(result.warnings).toEqual([
+    "finviz: GET https://finviz.com/quote.ashx?t=RGA&p=d failed: network request failed",
+  ]);
   expect(result.providers.find((provider) => provider.provider === "finviz")?.items).toHaveLength(
     0,
   );
@@ -314,6 +321,7 @@ test("SEC feed fetches by CIK while preserving ticker on filings", async () => {
     ticker: "RGA",
     cik: "0000898174",
     sources: ["sec-edgar"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     fetch: async (input) => {
       const href = fetchInputUrl(input);
       fetchedUrls.push(href);
@@ -367,7 +375,9 @@ test("company feed result reports provider health metadata for successful and fa
   expect(finvizProvider.status).toBe("error");
   expect(finvizProvider.itemCount).toBe(0);
   expect(finvizProvider.items).toEqual([]);
-  expect(finvizProvider.warnings).toEqual(["finviz: finviz unavailable"]);
+  expect(finvizProvider.warnings).toEqual([
+    "finviz: GET https://finviz.com/quote.ashx?t=RGA&p=d failed: network request failed",
+  ]);
   expect(Number.isNaN(Date.parse(finvizProvider.fetchedAt))).toBe(false);
   expect(finvizProvider.durationMs).toBeGreaterThanOrEqual(0);
   expect(finvizProvider.requestUrls).toEqual(["https://finviz.com/quote.ashx?t=RGA&p=d"]);
@@ -550,7 +560,9 @@ test("strict feed wrappers reject provider warnings and failures", async () => {
     throw new Error("Expected strict company feed to reject provider failures");
   }
   expect(companyError.message).toContain("News feed incomplete");
-  expect(companyError.message).toContain("finviz: finviz unavailable");
+  expect(companyError.message).toContain(
+    "finviz: GET https://finviz.com/quote.ashx?t=RGA&p=d failed: network request failed",
+  );
 
   let topicError: unknown;
   try {
@@ -568,7 +580,9 @@ test("strict feed wrappers reject provider warnings and failures", async () => {
     throw new Error("Expected strict topic feed to reject provider failures");
   }
   expect(topicError.message).toContain("Topic news feed incomplete");
-  expect(topicError.message).toContain("google-news: google unavailable");
+  expect(topicError.message).toContain(
+    "google-news: GET https://news.google.com/rss/search?q=AI+regulation&hl=en-US&gl=US&ceid=US%3Aen failed: network request failed",
+  );
 
   let watchlistError: unknown;
   try {

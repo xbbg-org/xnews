@@ -1,4 +1,5 @@
-import { cleanText, decodeEntities, stableId, stripCdata } from "./text.js";
+import { parsePublishedAt } from "./dates.js";
+import { cleanText, decodeEntities, safeHttpUrl, stableId, stripCdata } from "./text.js";
 import { normalizeLimit } from "./options.js";
 import type { NewsItem, NewsKind, NewsProvider } from "./types.js";
 
@@ -37,8 +38,8 @@ export function parseRssItems(xml: string, options: RssParseOptions): NewsItem[]
     const source = cleanText(readTag(block, "source")) || options.sourceFallback;
     const publishedAt = toIsoDate(pubDate);
     const decodedLink = decodeEntities(link);
-    const url = options.resolveUrl?.(decodedLink, guid) ?? decodedLink;
-
+    const url = safeHttpUrl(options.resolveUrl?.(decodedLink, guid) ?? decodedLink);
+    if (url === undefined) continue;
     items.push({
       id: stableId([options.provider, guid || link, title]),
       provider: options.provider,
@@ -74,16 +75,16 @@ export function parseAtomEntries(xml: string, options: AtomParseOptions): NewsIt
       (cleanText(readTag(block, "id")).match(/accession-number=([\d-]+)/)?.[1] ?? "");
     const formType = cleanText(readTag(block, "filing-type")) || readCategoryTerm(block);
     const publishedAt = toIsoDate(updated);
-    const decodedLink = decodeEntities(link);
+    const url = safeHttpUrl(decodeEntities(link));
+    if (url === undefined) continue;
     const source = readFirstTag(block, options.sourceTags ?? []) || options.sourceFallback;
-
     items.push({
       id: stableId([options.provider, accessionNumber || link, title]),
       provider: options.provider,
       kind: options.kind ?? "filing",
       title,
-      url: decodedLink,
-      canonicalUrl: decodedLink,
+      url,
+      canonicalUrl: url,
       source,
       ...(options.ticker ? { ticker: options.ticker.toUpperCase() } : {}),
       ...(publishedAt ? { publishedAt } : {}),
@@ -138,9 +139,7 @@ function readCategoryTerm(block: string): string {
 }
 
 function toIsoDate(value: string): string | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  return parsePublishedAt(value)?.instant;
 }
 
 export function inferNewsKind(source: string, title: string, link: string): NewsKind {

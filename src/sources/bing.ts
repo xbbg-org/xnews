@@ -1,22 +1,20 @@
-import { fetchText } from "../http.js";
+import { BROWSERISH_USER_AGENT, fetchText } from "../http.js";
+import { safeHttpUrl } from "../text.js";
 import { parseRssItems } from "../xml.js";
+import { bingNewsRssUrl } from "./bing.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
 
-export function bingNewsRssUrl(query: string): string {
-  const url = new URL("https://www.bing.com/news/search");
-  url.searchParams.set("q", query);
-  url.searchParams.set("format", "rss");
-  return url.toString();
-}
+export { bingNewsRssUrl } from "./bing.urls.js";
 
 export async function fetchBingNews(
   query: string,
   options: SourceFetchOptions = {},
 ): Promise<NewsItem[]> {
-  const xml = await fetchText(bingNewsRssUrl(query), {
-    ...options,
-    userAgent: options.userAgent ?? "Mozilla/5.0 xnews/0.1.0",
-  });
+  const xml = await fetchText(
+    bingNewsRssUrl(query),
+    options,
+    options.userAgent ?? BROWSERISH_USER_AGENT,
+  );
   return parseBingNews(xml, options.limit);
 }
 
@@ -32,9 +30,9 @@ export function parseBingNews(xml: string, limit?: number): NewsItem[] {
 function unwrapBingRedirect(link: string): string {
   try {
     const parsed = new URL(link);
-    if (!parsed.hostname.endsWith("bing.com")) return link;
-    const target = parsed.searchParams.get("url");
-    return target && /^https?:\/\//.test(target) ? target : link;
+    const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
+    if (host !== "bing.com" && !host.endsWith(".bing.com")) return link;
+    return safeHttpUrl(parsed.searchParams.get("url") ?? "") ?? link;
   } catch {
     return link;
   }

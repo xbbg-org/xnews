@@ -38,6 +38,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "import": "./dist/catalog.js"
+    },
+    "./parsers": {
+      "types": "./dist/parsers.d.ts",
+      "import": "./dist/parsers.js"
+    },
+    "./asr": {
+      "types": "./dist/asr.d.ts",
+      "import": "./dist/asr.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -45,7 +57,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target=node --format=esm --sourcemap=linked && bun run ./scripts/copy-sidecars.ts && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "bun build ./src/index.ts ./src/catalog.ts ./src/parsers.ts ./src/asr.ts --outdir ./dist --target=node --format=esm --splitting --sourcemap=linked && bun run ./scripts/copy-sidecars.ts && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint -c .oxlintrc.jsonc --tsconfig tsconfig.json .",

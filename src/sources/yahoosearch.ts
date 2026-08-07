@@ -9,15 +9,10 @@ import {
 import { normalizeLimit } from "../options.js";
 import { stableId } from "../text.js";
 import { inferNewsKind } from "../xml.js";
+import { yahooSearchUrl } from "./yahoosearch.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
 
-export function yahooSearchUrl(query: string, limit?: number): string {
-  const url = new URL("https://query1.finance.yahoo.com/v1/finance/search");
-  url.searchParams.set("q", query);
-  url.searchParams.set("newsCount", String(Math.min(normalizeLimit(limit) ?? 20, 50)));
-  url.searchParams.set("quotesCount", "0");
-  return url.toString();
-}
+export { yahooSearchUrl } from "./yahoosearch.urls.js";
 
 export async function fetchYahooSearchNews(
   query: string,

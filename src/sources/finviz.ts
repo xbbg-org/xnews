@@ -1,36 +1,13 @@
-import { fetchText } from "../http.js";
+import { parsePublishedAt } from "../dates.js";
+import { BROWSERISH_USER_AGENT, fetchText } from "../http.js";
 import { normalizeLimit } from "../options.js";
 import { cleanText, stableId, toAbsoluteUrl } from "../text.js";
+import { finvizQuoteUrl } from "./finviz.urls.js";
 import type { NewsItem, NewsKind, SourceFetchOptions } from "../types.js";
 
+export { finvizQuoteUrl } from "./finviz.urls.js";
+
 const FINVIZ_BASE_URL = "https://finviz.com";
-
-const MONTH_INDEX_BY_ABBR: Record<string, number> = {
-  Jan: 0,
-  Feb: 1,
-  Mar: 2,
-  Apr: 3,
-  May: 4,
-  Jun: 5,
-  Jul: 6,
-  Aug: 7,
-  Sep: 8,
-  Oct: 9,
-  Nov: 10,
-  Dec: 11,
-};
-
-const EASTERN_OFFSET_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  timeZoneName: "shortOffset",
-});
-
-export function finvizQuoteUrl(ticker: string): string {
-  const url = new URL("/quote.ashx", FINVIZ_BASE_URL);
-  url.searchParams.set("t", ticker.toUpperCase());
-  url.searchParams.set("p", "d");
-  return url.toString();
-}
 
 export async function fetchFinvizNews(
   ticker: string,
@@ -39,10 +16,11 @@ export async function fetchFinvizNews(
   const limit = normalizeLimit(options.limit);
   if (limit === 0) return [];
 
-  const html = await fetchText(finvizQuoteUrl(ticker), {
-    ...options,
-    userAgent: options.userAgent ?? "Mozilla/5.0 xnews/0.1.0",
-  });
+  const html = await fetchText(
+    finvizQuoteUrl(ticker),
+    options,
+    options.userAgent ?? BROWSERISH_USER_AGENT,
+  );
   return parseFinvizNews(html, ticker, limit);
 }
 
@@ -97,46 +75,17 @@ function normalizeFinvizTimestamp(
   const fullMatch = value.match(/^([A-Z][a-z]{2}-\d{2}-\d{2})\s+(\d{1,2}:\d{2}[AP]M)$/);
   if (fullMatch?.[1] && fullMatch[2]) {
     const text = `${fullMatch[1]} ${fullMatch[2]}`;
-    const iso = finvizTimestampToIso(text);
+    const iso = parsePublishedAt(text)?.instant;
     return { text, ...(iso ? { iso } : {}), currentDate: fullMatch[1] };
   }
 
   if (/^\d{1,2}:\d{2}[AP]M$/.test(value) && currentDate) {
     const text = `${currentDate} ${value}`;
-    const iso = finvizTimestampToIso(text);
+    const iso = parsePublishedAt(text)?.instant;
     return { text, ...(iso ? { iso } : {}), currentDate };
   }
 
   return { ...(value ? { text: value } : {}), currentDate };
-}
-
-function finvizTimestampToIso(value: string): string | undefined {
-  const match = value.match(/^([A-Z][a-z]{2})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})([AP]M)$/);
-  if (!match?.[1] || !match[2] || !match[3] || !match[4] || !match[5] || !match[6])
-    return undefined;
-
-  const month = MONTH_INDEX_BY_ABBR[match[1]];
-  if (month === undefined) return undefined;
-
-  const day = Number.parseInt(match[2], 10);
-  const year = 2000 + Number.parseInt(match[3], 10);
-  const hour12 = Number.parseInt(match[4], 10);
-  const minute = Number.parseInt(match[5], 10);
-  const hour = match[6] === "PM" ? (hour12 % 12) + 12 : hour12 % 12;
-  const utcGuess = new Date(Date.UTC(year, month, day, hour, minute));
-  return new Date(utcGuess.getTime() - easternOffsetMinutes(utcGuess) * 60_000).toISOString();
-}
-
-function easternOffsetMinutes(utcDate: Date): number {
-  const timeZoneName =
-    EASTERN_OFFSET_FORMATTER.formatToParts(utcDate).find((part) => part.type === "timeZoneName")
-      ?.value ?? "GMT-5";
-  const match = timeZoneName.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
-  if (!match?.[1] || !match[2]) return -300;
-
-  const hours = Number.parseInt(match[2], 10);
-  const minutes = match[3] ? Number.parseInt(match[3], 10) : 0;
-  return (match[1] === "-" ? -1 : 1) * (hours * 60 + minutes);
 }
 
 function parseFinvizSource(row: string): string {

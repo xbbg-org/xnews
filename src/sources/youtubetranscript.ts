@@ -1,7 +1,9 @@
-import { fetchText, postJson } from "../http.js";
+import { BROWSERISH_USER_AGENT, fetchText, postJson } from "../http.js";
 import { isRecord, recordArray, stringField } from "../json.js";
 import { cleanText } from "../text.js";
 import type { SourceFetchOptions } from "../types.js";
+import { youtubeWatchUrl } from "./youtubetranscript.urls.js";
+export { youtubeWatchUrl } from "./youtubetranscript.urls.js";
 
 /** Options for transcript fetches. */
 export interface YoutubeTranscriptOptions extends SourceFetchOptions {
@@ -39,7 +41,6 @@ export interface YoutubeTranscript {
   readonly text: string;
 }
 
-const BROWSERISH_USER_AGENT = "Mozilla/5.0 xnews/0.1.0";
 const VIDEO_ID_PATTERN = /^[0-9A-Za-z_-]{11}$/;
 const YOUTUBE_PLAYER_API_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 /**
@@ -50,10 +51,6 @@ const YOUTUBE_PLAYER_API_URL = "https://www.youtube.com/youtubei/v1/player?prett
  */
 const ANDROID_CLIENT_VERSION = "20.10.38";
 const ANDROID_USER_AGENT = `com.google.android.youtube/${ANDROID_CLIENT_VERSION} (Linux; U; Android 11) gzip`;
-
-export function youtubeWatchUrl(videoId: string): string {
-  return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
-}
 
 /**
  * Extracts the 11-character video ID from a bare ID, a watch/shorts/embed/
@@ -103,10 +100,6 @@ export async function fetchYoutubeTranscript(
   const videoId = extractYoutubeVideoId(video);
   if (!videoId) throw new Error(`Could not extract a YouTube video ID from "${video}"`);
 
-  const fetchOptions = options.userAgent
-    ? options
-    : { ...options, userAgent: BROWSERISH_USER_AGENT };
-
   let tracks: YoutubeCaptionTrack[] = [];
   let playerError: string | undefined;
   try {
@@ -124,14 +117,21 @@ export async function fetchYoutubeTranscript(
         },
         videoId,
       },
-      { ...options, userAgent: ANDROID_USER_AGENT },
+      options,
+      ANDROID_USER_AGENT,
     );
     tracks = parseYoutubeCaptionTracks(playerBody);
   } catch (error) {
     playerError = error instanceof Error ? error.message : String(error);
   }
   if (tracks.length === 0) {
-    tracks = parseYoutubeCaptionTracks(await fetchText(youtubeWatchUrl(videoId), fetchOptions));
+    tracks = parseYoutubeCaptionTracks(
+      await fetchText(
+        youtubeWatchUrl(videoId),
+        options,
+        options.userAgent ?? BROWSERISH_USER_AGENT,
+      ),
+    );
   }
 
   const track = pickYoutubeCaptionTrack(tracks, options.languages ?? ["en"]);
@@ -142,7 +142,11 @@ export async function fetchYoutubeTranscript(
     );
   }
 
-  const captionBody = await fetchText(track.url, fetchOptions);
+  const captionBody = await fetchText(
+    track.url,
+    options,
+    options.userAgent ?? BROWSERISH_USER_AGENT,
+  );
   const segments = parseYoutubeTranscriptSegments(captionBody);
   if (segments.length === 0 && captionBody.trim().length === 0) {
     throw new Error(

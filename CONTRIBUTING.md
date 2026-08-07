@@ -37,12 +37,14 @@ bun run smoke:packaged-install
 Every provider follows the same shape, so keep to it rather than introducing a second
 convention:
 
-- A URL builder (`fooRssUrl`), a pure parser (`parseFooNews`), and a fetcher
-  (`fetchFooNews`) that goes through `fetchText` with the injected `fetch`.
+- Put the URL builder (`fooRssUrl`) in `src/sources/foo.urls.ts`. Its transitive
+  imports must stay network-free; re-export it from `foo.ts` and `src/catalog.ts`.
+- Keep the pure parser (`parseFooNews`) and fetcher (`fetchFooNews`) in `foo.ts`;
+  fetchers go through `fetchText` with the injected `fetch`.
 - Parsers must be pure and total: given fixture text they return `NewsItem[]` without
   network access, and malformed upstream content yields warnings rather than throwing.
 - Register the provider in `src/feed.ts`, declare its capabilities, and export it from
-  `src/index.ts`.
+  `src/index.ts`. Export its parser from `src/parsers.ts`.
 - Add fixtures and tests under `test/`. Tests must not hit the network.
 - Document the provider in the README source catalog table.
 - Only free, keyless, public endpoints. Sources requiring paid plans or API keys, and

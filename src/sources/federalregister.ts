@@ -1,35 +1,11 @@
+import { parsePublishedAt } from "../dates.js";
 import { fetchText } from "../http.js";
 import { parseJsonRecord, recordArray, stringField } from "../json.js";
 import { normalizeLimit } from "../options.js";
 import { stableId } from "../text.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
-
-/** Federal Register API (https://www.federalregister.gov/developers/documentation/api/v1). */
-export function federalRegisterSearchUrl(
-  term: string,
-  options: Pick<SourceFetchOptions, "limit" | "since" | "until"> = {},
-): string {
-  const url = new URL("https://www.federalregister.gov/api/v1/documents.json");
-  url.searchParams.set("conditions[term]", term);
-  url.searchParams.set("order", "newest");
-  url.searchParams.set("per_page", String(Math.min(normalizeLimit(options.limit) ?? 20, 100)));
-  for (const field of [
-    "title",
-    "type",
-    "abstract",
-    "document_number",
-    "html_url",
-    "publication_date",
-    "agencies",
-  ]) {
-    url.searchParams.append("fields[]", field);
-  }
-  const since = toDateOnly(options.since);
-  const until = toDateOnly(options.until);
-  if (since) url.searchParams.set("conditions[publication_date][gte]", since);
-  if (until) url.searchParams.set("conditions[publication_date][lte]", until);
-  return url.toString();
-}
+import { federalRegisterSearchUrl } from "./federalregister.urls.js";
+export { federalRegisterSearchUrl } from "./federalregister.urls.js";
 
 export async function fetchFederalRegisterNews(
   term: string,
@@ -57,7 +33,7 @@ export function parseFederalRegisterNews(body: string, limit?: number): NewsItem
       .map((entry) => stringField(entry, "name")?.trim())
       .find(Boolean);
     const publicationDate = stringField(doc, "publication_date");
-    const publishedAt = publicationDate ? toIso(publicationDate) : undefined;
+    const publishedAt = publicationDate ? parsePublishedAt(publicationDate)?.instant : undefined;
     const summary = stringField(doc, "abstract")?.trim();
     const documentType = stringField(doc, "type")?.trim();
 
@@ -77,15 +53,4 @@ export function parseFederalRegisterNews(body: string, limit?: number): NewsItem
     if (normalizedLimit !== undefined && items.length >= normalizedLimit) break;
   }
   return items;
-}
-
-function toIso(value: string): string | undefined {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
-function toDateOnly(value: string | Date | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
 }

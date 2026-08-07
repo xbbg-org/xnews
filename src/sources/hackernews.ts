@@ -1,17 +1,12 @@
+import { parsePublishedAt } from "../dates.js";
 import { fetchText } from "../http.js";
 import { parseJsonRecord, recordArray, stringField } from "../json.js";
 import { normalizeLimit } from "../options.js";
 import { stableId } from "../text.js";
+import { hackerNewsSearchUrl } from "./hackernews.urls.js";
 import type { NewsItem, SourceFetchOptions } from "../types.js";
 
-/** Algolia Hacker News search API (https://hn.algolia.com/api): free and keyless. */
-export function hackerNewsSearchUrl(query: string, limit?: number): string {
-  const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
-  url.searchParams.set("query", query);
-  url.searchParams.set("tags", "story");
-  url.searchParams.set("hitsPerPage", String(Math.min(normalizeLimit(limit) ?? 50, 1000)));
-  return url.toString();
-}
+export { hackerNewsSearchUrl } from "./hackernews.urls.js";
 
 export async function fetchHackerNewsStories(
   query: string,
@@ -40,7 +35,7 @@ export function parseHackerNewsStories(body: string, limit?: number): NewsItem[]
     if (!url) continue;
 
     const createdAt = stringField(hit, "created_at");
-    const publishedAt = createdAt ? toIso(createdAt) : undefined;
+    const publishedAt = createdAt ? parsePublishedAt(createdAt)?.instant : undefined;
     items.push({
       id: stableId(["hacker-news", objectId ?? url, title]),
       provider: "hacker-news",
@@ -56,9 +51,4 @@ export function parseHackerNewsStories(body: string, limit?: number): NewsItem[]
     if (normalizedLimit !== undefined && items.length >= normalizedLimit) break;
   }
   return items;
-}
-
-function toIso(value: string): string | undefined {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }

@@ -312,6 +312,7 @@ test("company feed integrates new providers through injected fetch", async () =>
     ticker: "RGA",
     companyName: "Reinsurance Group of America",
     sources: ["tickertick", "bing-news", "sec-fulltext", "seeking-alpha", "marketwatch"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     fetch: async (input) => {
       const href = fetchInputUrl(input);
       fetchedUrls.push(href);
@@ -405,6 +406,7 @@ test("date windows propagate into query provider request urls", async () => {
     since: "2026-06-01T00:00:00.000Z",
     until: "2026-07-01T00:00:00.000Z",
     secForms: ["8-K"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     fetch: async (input) => {
       const href = fetchInputUrl(input);
       if (href.includes("efts.sec.gov")) return new Response(secFullTextJsonFixture);
@@ -468,6 +470,7 @@ test("sec-current company subjects search EDGAR by company name per form", async
     ticker: "RGA",
     companyName: "Reinsurance Group of America",
     sources: ["sec-current"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     secForms: ["8-K", "4"],
     fetch: async (input) => {
       fetchedUrls.push(fetchInputUrl(input));
@@ -507,6 +510,7 @@ test("sec-current topic subjects stream the market-wide feed and filter locally"
   const result = await buildTopicNewsFeedResult({
     query: "insurance holdings",
     sources: ["sec-current"],
+    secUserAgent: "xnews-tests/1.0 tests@example.com",
     fetch: async (input) => {
       fetchedUrls.push(fetchInputUrl(input));
       return new Response(secCurrentAtomFixture);
@@ -589,6 +593,7 @@ test("msrb-emma topic subjects stream recent windows and dedupe overlaps", async
   const result = await buildTopicNewsFeedResult({
     query: "rating change",
     sources: ["msrb-emma"],
+    msrbAcceptTermsOfUse: true,
     fetch: async (input) => {
       fetchedUrls.push(fetchInputUrl(input));
       return new Response(msrbEmmaJsonFixture);
@@ -617,6 +622,7 @@ test("msrb-emma company subjects match issuer names and require a name", async (
     ticker: "",
     companyName: "Utah County Utah Transn Sales Tax Rev",
     sources: ["msrb-emma"],
+    msrbAcceptTermsOfUse: true,
     fetch: async () => new Response(msrbEmmaJsonFixture),
   });
   expect(result.providers[0]?.status).toBe("ok");
