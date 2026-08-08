@@ -16,17 +16,84 @@ export { inferNewsKind, parseAtomEntries, parseRssItems } from "./xml.js";
 export type { AtomParseOptions, RssParseOptions } from "./xml.js";
 export { subjectMatcher } from "./sources/match.js";
 export type { SubjectMatchItem, SubjectMatchTerms } from "./sources/match.js";
+export { parseCsvRecords, parseCsvTable } from "./csv.js";
+export { MAX_ZIP_UNCOMPRESSED_BYTES, readZipEntries } from "./zip.js";
+export type { ZipEntry } from "./zip.js";
 
+export { parseAlphaVantageTranscript } from "./sources/alphavantage.js";
+export type { AlphaVantageTranscript, AlphaVantageTranscriptTurn } from "./sources/alphavantage.js";
+export { parseAnnasArchiveRecords } from "./sources/annasarchive.js";
+export type { AnnasArchiveParseOptions } from "./sources/annasarchive.js";
+export { parseArxivPapers } from "./sources/arxiv.js";
 export { parseBingNews } from "./sources/bing.js";
+export {
+  parseBisResearchHub,
+  parseBisResearchHubRecent,
+  parseBisWorkingPapers,
+} from "./sources/bis.js";
 export { parseCourtListenerNews } from "./sources/courtlistener.js";
+export { parseCotRows } from "./sources/cot.js";
+export type {
+  CotCitRow,
+  CotDisaggregatedRow,
+  CotLegacyRow,
+  CotPositions,
+  CotRow,
+  CotTffRow,
+} from "./sources/cot.js";
+export { parseDtccSliceCatalog, parseDtccTradeCsv, parseDtccTradeZip } from "./sources/dtcc.js";
+export type { DtccTradeEvent } from "./sources/dtcc.js";
+export type { DtccSliceCatalogEntry, DtccSliceFileNameInfo } from "./sources/dtcc.urls.js";
+export {
+  parseFfiecBulkPage,
+  parseFfiecCallBundle,
+  parseFfiecFourPeriodBundle,
+  parseFfiecTsvRows,
+  parseFfiecUbprBundle,
+} from "./sources/ffiec.js";
+export type {
+  FfiecBulkPage,
+  FfiecCallBundle,
+  FfiecFourPeriodBundle,
+  FfiecFourPeriodFiling,
+  FfiecInstitution,
+  FfiecSchedule,
+  FfiecScheduleColumn,
+  FfiecScheduleFacts,
+  FfiecUbprBundle,
+  FfiecUbprColumn,
+  FfiecUbprFiling,
+  FfiecUbprKind,
+  FfiecUbprReport,
+} from "./sources/ffiec.js";
 export { parseFederalRegisterNews } from "./sources/federalregister.js";
 export { parseFinvizNews } from "./sources/finviz.js";
 export { parseFixedFeedNews } from "./sources/fixedfeeds.js";
 export { parseGdeltNews } from "./sources/gdelt.js";
+export { parseFredObservations, parseFredSeries, parseFredSeriesSearch } from "./sources/fred.js";
 export { parseGoogleNews } from "./sources/google.js";
+export { parseEarningsCallTranscripts } from "./sources/hftranscripts.js";
+export type {
+  EarningsCallTranscript,
+  EarningsCallTranscriptTurn,
+} from "./sources/hftranscripts.js";
 export { parseHackerNewsStories } from "./sources/hackernews.js";
+export { parseInternetArchiveWorks } from "./sources/internetarchive.js";
+export type { InternetArchiveParseOptions } from "./sources/internetarchive.js";
+export {
+  parseByteSize,
+  parseLibgenBooks,
+  parseLibgenDownloads,
+  parsePageCount,
+  parseTitleCell,
+} from "./sources/libgen.js";
+export type { LibgenBook, LibgenPage, LibgenParseOptions, LibgenRawRow } from "./sources/libgen.js";
 export { parseMsrbEmmaDisclosures } from "./sources/msrbemma.js";
 export { parseNasdaqNews } from "./sources/nasdaq.js";
+export { parseOpenAlexWorks } from "./sources/openalex.js";
+export type { OpenAlexWorksPage } from "./sources/openalex.js";
+export { parseOpenLibraryWorks } from "./sources/openlibrary.js";
+export type { OpenLibraryParseOptions } from "./sources/openlibrary.js";
 export { parseSecFilings } from "./sources/sec.js";
 export { parseSecCurrentFilings } from "./sources/seccurrent.js";
 export { parseSecFullTextFilings } from "./sources/secfulltext.js";

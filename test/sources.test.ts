@@ -277,6 +277,21 @@ test("createTopicNewsWatcher yields an initial realtime batch from an injected G
   await watcher.return(undefined);
 });
 
+test("createTopicNewsWatcher surfaces total provider failure", async () => {
+  const watcher = createTopicNewsWatcher({
+    query: "insurance regulation",
+    sources: ["google-news"],
+    intervalMs: 60_000,
+    fetch: async () => new Response("unavailable", { status: 503 }),
+  });
+
+  const rejection = await watcher.next().catch((error: unknown) => error);
+  expect(rejection).toBeInstanceOf(Error);
+  if (rejection instanceof Error) {
+    expect(rejection.message).toContain("Topic news feed unavailable");
+  }
+});
+
 test("partial provider failures return successful items and result warnings", async () => {
   const query: CompanyNewsQuery = {
     ticker: "RGA",

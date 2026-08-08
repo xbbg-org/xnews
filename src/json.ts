@@ -11,7 +11,7 @@ export function parseJsonRecord(body: string, apiLabel: string): Record<string, 
     parsed = undefined;
   }
   if (!isRecord(parsed)) {
-    throw new Error(`unexpected non-JSON ${apiLabel} response: ${body.slice(0, 120)}`);
+    throw new Error(`unexpected non-JSON ${apiLabel} response`);
   }
   return parsed;
 }

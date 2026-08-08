@@ -24,6 +24,7 @@ const QUERY_PROVIDERS: readonly NewsProvider[] = [
   "msrb-emma",
   "nasdaq",
   "seeking-alpha",
+  "hf-transcripts",
 ];
 
 const ALL_PROVIDERS: readonly NewsProvider[] = [...QUERY_PROVIDERS, ...FIXED_FEED_PROVIDERS];

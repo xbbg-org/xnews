@@ -8,8 +8,8 @@ import {
   youtubeChannelPageUrl,
   type YoutubeFeedOptions,
 } from "./youtube.urls.js";
-export { youtubeChannelFeedUrl } from "./youtube.urls.js";
-export type { YoutubeFeedOptions } from "./youtube.urls.js";
+export { COMPANY_COMMENTARY_YOUTUBE_CHANNELS, youtubeChannelFeedUrl } from "./youtube.urls.js";
+export type { CommentaryChannelDefinition, YoutubeFeedOptions } from "./youtube.urls.js";
 
 /** Per-channel outcome of a subscription fetch. */
 export interface YoutubeChannelResult {

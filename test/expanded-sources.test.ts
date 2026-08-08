@@ -276,6 +276,22 @@ test("press-release wires mark filtered items as press releases", () => {
   expect(items[0]?.source).toBe("PR Newswire");
 });
 
+test("bank-regulator announcement feeds are registered as press-release wires", () => {
+  for (const provider of ["ffiec", "fdic", "occ", "cfpb"] as const) {
+    expect(FIXED_FEED_PROVIDERS).toContain(provider);
+    expect(FIXED_FEEDS[provider].kind).toBe("press-release");
+    expect(FIXED_FEEDS[provider].suggestedMinPollSeconds).toBeGreaterThanOrEqual(600);
+    for (const url of FIXED_FEEDS[provider].urls) {
+      expect(url.startsWith("https://")).toBe(true);
+    }
+  }
+
+  const items = parseFixedFeedNews("fdic", marketFeedRssFixture, { ticker: "RGA" });
+  expect(items).toHaveLength(1);
+  expect(items[0]?.kind).toBe("press-release");
+  expect(items[0]?.source).toBe("FDIC");
+});
+
 test("subject matcher requires cashtag or exchange context for single-letter tickers", () => {
   const matches = subjectMatcher({ ticker: "A" });
 

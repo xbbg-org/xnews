@@ -1,0 +1,24 @@
+# xnews mirror pools — template. Copy to `mirrors.local.txt` (gitignored) and
+# fill in the origins you have chosen to query, or point XNEWS_MIRRORS_FILE at
+# a file of your own.
+#
+# Format
+#   [pool]        names a pool; adapters ask for a pool by name
+#   https://host  one origin per line, https only
+#   host          a bare host is read as https://host
+#   # text        a comment; a trailing comment becomes the entry's label
+#
+# Entries written before the first [pool] header land in the "default" pool.
+# Within a pool, origins are tried in order and only a *failed request*
+# advances to the next one.
+#
+# Load it:
+#   const list = await loadMirrorList();
+#   const source = libgenSource({ mirrors: mirrorBaseUrls(list, "libgen") });
+
+[libgen]
+# https://your-chosen-mirror.example
+# https://your-fallback-mirror.example    # tried only if the first one fails
+
+[annas-archive]
+# https://your-chosen-mirror.example

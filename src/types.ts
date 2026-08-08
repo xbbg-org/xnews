@@ -15,6 +15,7 @@ export type NewsProvider =
   | "msrb-emma"
   | "nasdaq"
   | "seeking-alpha"
+  | "hf-transcripts"
   | "marketwatch"
   | "wsj"
   | "cnbc"
@@ -22,6 +23,10 @@ export type NewsProvider =
   | "globenewswire"
   | "federal-reserve"
   | "sec-press"
+  | "ffiec"
+  | "fdic"
+  | "occ"
+  | "cfpb"
   | "coindesk"
   | "cointelegraph"
   | "benzinga"
@@ -37,7 +42,65 @@ export type NewsProvider =
   | "fortune"
   | "forbes"
   | "washington-post"
-  | "youtube";
+  | "youtube"
+  | "cftc-cot"
+  | "ffiec-cdr"
+  | "dtcc-sdr"
+  | "arxiv"
+  | "openalex"
+  | "bis-research"
+  | "bis-research-hub"
+  | "nber"
+  | "ssrn"
+  | "crossref"
+  | "world-bank"
+  | "biorxiv"
+  | "medrxiv"
+  | "europe-pmc"
+  | "hf-papers"
+  | "osf-preprints"
+  | "bis-press"
+  | "bis-speeches"
+  | "bcb-news"
+  | "boj-news"
+  | "bok-news"
+  | "rbi-news"
+  | "bsp-news"
+  | "hkma-news"
+  | "rba-news"
+  | "rbnz-news"
+  | "banco-de-espana-news"
+  | "banca-ditalia-news"
+  | "dnb-news"
+  | "central-bank-ireland-news"
+  | "cnb-news"
+  | "mnb-news"
+  | "tcmb-news"
+  | "sarb-news"
+  | "norges-bank-news"
+  | "riksbank-news"
+  | "central-bank-iceland-news"
+  | "ecb-news"
+  | "bank-england-news"
+  | "bank-canada-news"
+  | "bundesbank-news"
+  | "snb-news"
+  | "atlanta-fed-news"
+  | "richmond-fed-news"
+  | "dallas-fed-news"
+  | "fed-board-research"
+  | "bcb-research"
+  | "bok-research"
+  | "hkma-research"
+  | "ecb-research"
+  | "bank-canada-research"
+  | "bundesbank-research"
+  | "norges-bank-research"
+  | "snb-research"
+  | "rba-research"
+  | "banco-de-espana-research"
+  | "banca-ditalia-research"
+  | "dnb-research";
 
 export type NewsProviderCapability = "company" | "topic" | "filing";
 
@@ -75,7 +138,14 @@ export type MarketEventKind =
   | "market"
   | "unknown";
 
-export type NewsKind = "article" | "filing" | "press-release" | "analysis" | "video" | "unknown";
+export type NewsKind =
+  | "article"
+  | "filing"
+  | "press-release"
+  | "analysis"
+  | "video"
+  | "data"
+  | "unknown";
 
 export interface CompanyNewsSubjectInput {
   readonly kind: "company";
@@ -125,6 +195,31 @@ export interface NewsItem {
   readonly tags?: readonly string[];
   readonly seenInProviders?: readonly NewsProvider[];
   readonly provenance?: readonly NewsItemProvenance[];
+  research?: ResearchPaperMetadata;
+}
+
+export interface ResearchPaperMetadata {
+  readonly authors?: readonly string[];
+  readonly institution?: string;
+  readonly country?: string;
+  readonly series?: string;
+  readonly issue?: string;
+  readonly doi?: string;
+  readonly jelCodes?: readonly string[];
+  readonly categories?: readonly string[];
+  readonly externalId?: string;
+  readonly version?: string;
+  readonly submittedAt?: string;
+  readonly updatedAt?: string;
+  readonly announcedAt?: string;
+  readonly announceType?: string;
+  readonly pdfUrl?: string;
+  readonly licenseUrl?: string;
+}
+
+export interface ResearchPaper extends NewsItem {
+  kind: "analysis";
+  research: ResearchPaperMetadata;
 }
 
 export interface NewsItemProvenance {
@@ -139,11 +234,21 @@ export interface SourceFetchOptions {
   readonly fetch?: SourceFetch;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  /** Maximum response body size in bytes; defaults to 32 MiB. */
+  readonly maxResponseBytes?: number;
   /**
    * Redirect semantics enforced by xnews. `"follow"` (default) revalidates
    * policy on at most ten hops; the injected fetch receives `"manual"`.
    */
   readonly redirect?: RequestRedirect;
+  /**
+   * Allows a redirect to leave the requested origin even when a caller
+   * User-Agent, sensitive query parameter, request body, or extra header
+   * would otherwise refuse it. File downloads need this: catalogs mint a
+   * short-lived token on their own host and redirect to a CDN. A redirect
+   * into a private network address is still refused.
+   */
+  readonly allowCrossOriginRedirects?: boolean;
   readonly userAgent?: string;
   readonly secUserAgent?: string;
   /**
@@ -162,6 +267,22 @@ export interface NewsFeedOptions extends SourceFetchOptions {
   readonly sources?: readonly NewsProvider[];
   readonly strict?: boolean;
   readonly secForms?: readonly string[];
+  /** API key required for opt-in OpenAlex Works retrieval. */
+  readonly openAlexApiKey?: string;
+  /** Restricts opt-in arXiv results; leaf IDs match exactly, while archives like `econ` include all subcategories. */
+  readonly arxivCategories?: string | readonly string[];
+  /** Restricts opt-in BIS research results to these exact institution names. */
+  readonly bisInstitutions?: readonly string[];
+  /** Restricts opt-in SSRN results to these networks; names or numeric binding ids. */
+  readonly ssrnNetworks?: readonly ("fen" | "arn" | "ern" | number)[];
+  /** Extra Crossref `filter` facets merged into opt-in Crossref queries. */
+  readonly crossrefFilters?: Readonly<Record<string, string | readonly string[]>>;
+  /** Restricts opt-in World Bank results to these document types. */
+  readonly worldBankDocTypes?: readonly string[];
+  /** Restricts opt-in bioRxiv/medRxiv results to these subject categories. */
+  readonly bioRxivCategories?: readonly string[];
+  /** Restricts opt-in OSF results to these preprint providers (e.g. `socarxiv`). */
+  readonly osfProviders?: readonly string[];
 }
 
 export interface CompanyNewsQuery extends NewsFeedOptions {
@@ -246,4 +367,296 @@ export interface WatchlistNewsFeedResult {
 export interface WatchlistNewsOptions extends WatchlistNewsQuery {
   readonly intervalMs?: number;
   readonly seenIds?: Iterable<string>;
+}
+
+/**
+ * A dated payload of structured rows from a scheduled data publisher — the
+ * data lane's counterpart of a news article. `asOf` is the date the rows
+ * describe, which for scheduled releases precedes publication: CFTC COT rows
+ * are as of Tuesday and normally published Friday afternoon.
+ */
+export interface DataRelease<Row> {
+  /** Data-source identifier; data-only sources such as FRED need not be a `NewsProvider`. */
+  readonly provider: string;
+  readonly dataset: string;
+  /** ISO date (`YYYY-MM-DD`) the rows are stated as of. */
+  readonly asOf: string;
+  /**
+   * Publisher's monotonic release counter, for datasets that publish many
+   * releases per `asOf` date (e.g. DTCC intraday slice IDs). When present,
+   * `createDataReleaseWatcher` orders and dedupes on `sequence` instead of
+   * `asOf`, and drains a backlog of sequenced releases without sleeping
+   * between polls.
+   */
+  readonly sequence?: number;
+  /** Canonical human-facing URL for the dataset. */
+  readonly url: string;
+  /**
+   * ISO date (`YYYY-MM-DD`) the publisher last revised this dataset, when
+   * the publisher exposes one (e.g. FFIEC CDR's "Call Updated" stamp).
+   * Late refilings can move `updatedAt` without changing `asOf`; the
+   * release watcher keys on `asOf` alone, so a refile of an already-seen
+   * period does not re-yield. Watch the publisher's stamp directly (e.g.
+   * `fetchFfiecBulkPage().callUpdated`) when revisions matter.
+   */
+  readonly updatedAt?: string;
+  readonly rows: readonly Row[];
+}
+
+/**
+ * Transport options for one data-release fetch. `ifNewerThan` is a skip
+ * hint, not a filter: a source MAY resolve `undefined` without dialing its
+ * heavy endpoints when it can cheaply determine the current release is not
+ * strictly newer than this ISO date. `createDataReleaseWatcher` passes the
+ * last yielded `asOf` here so multi-megabyte sources (e.g. FFIEC bulk zips)
+ * are not re-downloaded every poll. Sources are free to ignore it.
+ */
+export interface DataFetchOptions extends SourceFetchOptions {
+  readonly ifNewerThan?: string;
+  /**
+   * Exclusive lower bound for sequenced datasets: return the earliest
+   * release whose `sequence` is strictly greater, or `undefined` when the
+   * consumer is caught up. Without it a sequenced source returns its latest
+   * release. `createDataReleaseWatcher` passes the last yielded `sequence`
+   * here so a backlog is consumed in order and without gaps. Sources that
+   * publish one release per `asOf` ignore it.
+   */
+  readonly afterSequence?: number;
+}
+
+/**
+ * Binds one provider dataset to its transport: everything the data lane's
+ * generic machinery (`fetchDataRelease`, `createDataReleaseWatcher`) needs
+ * to fetch and label releases. Built-in providers export factories returning
+ * sources (see `cotDataSource`); consumers can implement `DataSource` for
+ * their own publishers and reuse the same machinery.
+ */
+export interface DataSource<Row> {
+  readonly provider: string;
+  readonly dataset: string;
+  /** URLs the next `fetchRelease` call would dial, for observability. */
+  requestUrls(options?: DataFetchOptions): readonly string[];
+  /** Resolves `undefined` when the dataset currently has no matching data. */
+  fetchRelease(options?: DataFetchOptions): Promise<DataRelease<Row> | undefined>;
+}
+
+/** Uniform non-throwing outcome envelope for one data-release fetch. */
+export interface DataProviderResult<Row> {
+  readonly provider: string;
+  readonly dataset: string;
+  readonly status: ProviderStatus;
+  /** Present unless the fetch failed or found no data at all. */
+  readonly release?: DataRelease<Row>;
+  readonly rowCount: number;
+  readonly warnings: readonly string[];
+  readonly fetchedAt: string;
+  readonly durationMs: number;
+  readonly requestUrls: readonly string[];
+  readonly error?: ProviderError;
+}
+
+export interface DataReleaseWatcherOptions extends SourceFetchOptions {
+  /** Poll interval in milliseconds; defaults to 15 minutes. */
+  readonly intervalMs?: number;
+  /** Only releases with `asOf` strictly after this ISO date are yielded. */
+  readonly sinceAsOf?: string;
+  /**
+   * For sequenced sources: only releases with `sequence` strictly greater
+   * than this are yielded, so restarts do not replay consumed releases.
+   */
+  readonly sinceSequence?: number;
+}
+
+/**
+ * Built-in works providers. The works lane is bibliographic catalog lookup:
+ * news providers answer with dated documents and data providers with dated
+ * rows, but a works provider answers a *query* with catalog records that
+ * carry no release date and have no natural time ordering. Neither lane's
+ * machinery fits, so the works lane has its own (see `src/works.ts`).
+ *
+ * `annas-archive` and `libgen` are mirror-based: they dial only origins the
+ * caller supplies (see `src/mirrors.ts`). `internet-archive` and
+ * `open-library` have stable official APIs and carry their own origin.
+ */
+export type WorksProvider = "annas-archive" | "internet-archive" | "libgen" | "open-library";
+
+/**
+ * Catalog-reported access signal. `open-access` and `public-domain` report the
+ * corresponding catalog classification; `preview` and `borrow` report limited
+ * access modes; `metadata-only` reports no file access; and `unknown` means
+ * the catalog supplied no recognized availability metadata.
+ */
+export type WorkAvailability =
+  | "open-access"
+  | "public-domain"
+  | "preview"
+  | "borrow"
+  | "metadata-only"
+  | "unknown";
+
+/**
+ * Whether identifiers came from the record itself or were inferred by
+ * matching it against an authoritative catalog.
+ */
+export type WorkIdentityOrigin = "record" | "resolved";
+
+/**
+ * Bibliographic identifiers for one record. Catalogs that scrape file
+ * listings often state none of them, which is why `origin` and `confidence`
+ * are part of the identity rather than assumed by callers.
+ */
+export interface WorkIdentity {
+  readonly isbn13?: string;
+  readonly isbn10?: string;
+  readonly doi?: string;
+  readonly oclc?: string;
+  readonly lccn?: string;
+  readonly openLibraryId?: string;
+  /** Content hash, for catalogs that address files rather than editions. */
+  readonly md5?: string;
+  /**
+   * `"record"` means the provider stated these identifiers. `"resolved"`
+   * means `resolveWorkIdentity` inferred them from a fuzzy match against an
+   * authoritative catalog; callers MUST check `confidence` before treating
+   * them as authoritative.
+   */
+  readonly origin: WorkIdentityOrigin;
+  /** 0-1, and always 1 when `origin` is `"record"`. */
+  readonly confidence: number;
+}
+
+/** One provider's claim about where a record was seen. */
+export interface WorkRecordProvenance {
+  readonly provider: string;
+  readonly url: string;
+}
+
+/**
+ * One bibliographic record, normalized across catalogs. Numeric fields are
+ * absent rather than zero when the provider stated an uncoercible value, and
+ * the reason lands in `warnings` so a layout change surfaces instead of
+ * silently degrading every row.
+ */
+export interface WorkRecord {
+  /** Built-in providers use their `WorksProvider` name (e.g. `"libgen"`). */
+  readonly provider: string;
+  /** Provider-native record id, stable within `provider`. */
+  readonly sourceId: string;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly authors: readonly string[];
+  readonly publisher?: string;
+  readonly publishedYear?: number;
+  readonly edition?: string;
+  readonly series?: string;
+  readonly language?: string;
+  /** Lowercase file extension, when the record describes a file. */
+  readonly format?: string;
+  readonly pageCount?: number;
+  readonly sizeBytes?: number;
+  readonly identity: WorkIdentity;
+  readonly availability: WorkAvailability;
+  /** Canonical absolute human-facing URL for the record. */
+  readonly url: string;
+  /** ISO instant the catalog first listed the record, when stated. */
+  readonly addedAt?: string;
+  /** ISO instant the catalog last revised the record, when stated. */
+  readonly modifiedAt?: string;
+  readonly warnings: readonly string[];
+  readonly provenance: readonly WorkRecordProvenance[];
+}
+
+/**
+ * One catalog query. At least one of the query fields must be set; sources
+ * reject an empty query with a `config` error rather than dialing a catalog
+ * with no terms. `limit` caps returned records and `maxPages` caps how many
+ * result pages a paginating source walks to reach that limit.
+ */
+export interface WorksQuery extends SourceFetchOptions {
+  /** Free-text query across whatever fields the catalog searches. */
+  readonly query?: string;
+  readonly title?: string;
+  readonly author?: string;
+  readonly isbn?: string;
+  readonly doi?: string;
+  /** First result page to read, 1-based; defaults to 1. */
+  readonly page?: number;
+  /** Max result pages to walk; defaults to 1. */
+  readonly maxPages?: number;
+}
+
+/** One page of catalog records plus what it took to get them. */
+export interface WorksPage<Item = WorkRecord> {
+  readonly items: readonly Item[];
+  /** 1-based page number of the first page read. */
+  readonly page: number;
+  /** Whether the catalog indicated further pages past those read. */
+  readonly hasMore: boolean;
+  /** Total matches the catalog claims, when it states one. */
+  readonly totalCount?: number;
+  readonly warnings: readonly string[];
+  readonly requestUrls: readonly string[];
+}
+
+/**
+ * Binds one catalog to its transport: everything `searchWorks` needs to query
+ * it and label the results. Built-in providers export factories returning
+ * sources (see `libgenSource`, `openLibrarySource`); consumers can implement
+ * `WorksSource` for their own catalogs and reuse the same machinery.
+ */
+export interface WorksSource {
+  readonly provider: string;
+  /** URLs the next `search` call would dial, for observability. */
+  requestUrls(query: WorksQuery): readonly string[];
+  search(query: WorksQuery): Promise<WorksPage>;
+}
+
+/** Uniform non-throwing outcome envelope for one catalog search. */
+export interface WorksResult {
+  readonly provider: string;
+  readonly status: ProviderStatus;
+  /** Present unless the search failed outright. */
+  readonly page?: WorksPage;
+  readonly items: readonly WorkRecord[];
+  readonly recordCount: number;
+  readonly warnings: readonly string[];
+  readonly fetchedAt: string;
+  readonly durationMs: number;
+  readonly requestUrls: readonly string[];
+  readonly error?: ProviderError;
+}
+
+/** One scored authoritative candidate for a record being resolved. */
+export interface WorkIdentityCandidate {
+  readonly record: WorkRecord;
+  /** 0-1 similarity against the record being resolved. */
+  readonly score: number;
+}
+
+/**
+ * Outcome of resolving a record's identifiers against an authoritative
+ * catalog. `matched` is set only when the best candidate met the confidence
+ * floor; `candidates` is always populated so callers can review near misses.
+ */
+export interface WorkIdentityResolution {
+  readonly identity: WorkIdentity;
+  readonly matched?: WorkRecord;
+  readonly candidates: readonly WorkIdentityCandidate[];
+  readonly warnings: readonly string[];
+  /**
+   * Status of the authoritative lookup. `error` and `disabled` mean the
+   * catalog never answered, so an absent `matched` states nothing about
+   * whether the work exists — distinguishing that from a genuine no-match is
+   * why this is not left to warning prose.
+   */
+  readonly status: ProviderStatus;
+  /** Set when `status` is `error` or `disabled`. */
+  readonly error?: ProviderError;
+}
+
+export interface ResolveWorkIdentityOptions extends SourceFetchOptions {
+  /** Minimum score to accept as a match; defaults to 0.82. */
+  readonly minConfidence?: number;
+  /** Max authoritative candidates to score; defaults to 10. */
+  readonly maxCandidates?: number;
 }

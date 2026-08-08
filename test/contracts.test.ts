@@ -17,7 +17,7 @@ import {
   XnewsFetchError,
 } from "../src/index.js";
 import type { ProviderResult } from "../src/index.js";
-import { fetchText } from "../src/http.js";
+import { fetchRaw, fetchText, postJson } from "../src/http.js";
 import { parseAtomEntries, parseRssItems } from "../src/parsers.js";
 
 const googleWindowFixture = `<?xml version="1.0" encoding="UTF-8"?>
@@ -77,6 +77,77 @@ test("transport enforces redirect semantics before the injected fetch", async ()
   expect(failure.message).not.toContain("secret");
 });
 
+test("transport cancels discarded redirect and error response bodies", async () => {
+  let followedRedirectCancellations = 0;
+  let followedCalls = 0;
+  const pendingCancellation = Promise.withResolvers<void>().promise;
+  const followedRedirectBody = new ReadableStream<Uint8Array>({
+    cancel() {
+      followedRedirectCancellations += 1;
+      return pendingCancellation;
+    },
+  });
+  const followed = await fetchText("https://example.com/redirect-start", {
+    fetch: async (input) => {
+      followedCalls += 1;
+      if (requestUrl(input) === "https://example.com/redirect-start") {
+        return new Response(followedRedirectBody, {
+          status: 302,
+          headers: { Location: "https://example.com/redirect-final" },
+        });
+      }
+      expect(followedRedirectCancellations).toBe(1);
+      return new Response("done");
+    },
+  });
+  expect(followed).toBe("done");
+  expect(followedCalls).toBe(2);
+  expect(followedRedirectCancellations).toBe(1);
+
+  let refusedRedirectCancellations = 0;
+  const refusedRedirectBody = new ReadableStream<Uint8Array>({
+    cancel() {
+      refusedRedirectCancellations += 1;
+      throw new Error("redirect cancellation failed");
+    },
+  });
+  const refusedRedirect = await captureXnewsError(
+    fetchText("https://example.com/refused-redirect", {
+      redirect: "error",
+      fetch: async () =>
+        new Response(refusedRedirectBody, {
+          status: 302,
+          headers: { Location: "https://example.com/not-followed" },
+        }),
+    }),
+  );
+  expect(refusedRedirect).toMatchObject({
+    code: "network",
+    url: "https://example.com/refused-redirect",
+  });
+  expect(refusedRedirect.status).toBeUndefined();
+  expect(refusedRedirectCancellations).toBe(1);
+
+  let statusCancellations = 0;
+  const statusBody = new ReadableStream<Uint8Array>({
+    cancel() {
+      statusCancellations += 1;
+      throw new Error("status cancellation failed");
+    },
+  });
+  const statusFailure = await captureXnewsError(
+    fetchText("https://example.com/unavailable", {
+      fetch: async () => new Response(statusBody, { status: 503 }),
+    }),
+  );
+  expect(statusFailure).toMatchObject({
+    code: "http_status",
+    status: 503,
+    url: "https://example.com/unavailable",
+  });
+  expect(statusCancellations).toBe(1);
+});
+
 test("redirect hops reapply protected-host policy and strip scoped headers", async () => {
   const blockedRequests: Array<{ readonly url: string; readonly init?: RequestInit }> = [];
   const blocked = await captureXnewsError(
@@ -118,6 +189,372 @@ test("redirect hops reapply protected-host policy and strip scoped headers", asy
   expect(escapedRequests[1]?.headers.get("User-Agent")).not.toBe(
     "xnews-contract-test/1.0 tests@example.com",
   );
+});
+
+test("redirect policy rejects downgrade and non-public literal targets", async () => {
+  const blockedTargets = [
+    "http://www.bis.org/insecure",
+    "https://localhost/internal",
+    "https://127.0.0.1/internal",
+    "https://10.0.0.1/internal",
+    "https://169.254.1.1/internal",
+    "https://224.0.0.1/internal",
+    "https://192.0.2.1/internal",
+    "https://[::1]/internal",
+    "https://[fc00::1]/internal",
+    "https://[fe80::1]/internal",
+    "https://[ff00::1]/internal",
+    "https://[2001:db8::1]/internal",
+  ] as const;
+
+  for (const target of blockedTargets) {
+    let calls = 0;
+    const failure = await captureXnewsError(
+      fetchText("https://example.com/start", {
+        fetch: async () => {
+          calls += 1;
+          return new Response(null, { status: 302, headers: { Location: target } });
+        },
+      }),
+    );
+    expect(failure).toMatchObject({ code: "network", url: target });
+    expect(calls).toBe(1);
+  }
+});
+
+test("redirect policy blocks sensitive cross-origin hops but allows public HTTPS hops", async () => {
+  const secret = "credential-must-not-leak";
+  let blockedCalls = 0;
+  const blocked = await captureXnewsError(
+    fetchText(`https://example.com/start?api_key=${secret}`, {
+      fetch: async () => {
+        blockedCalls += 1;
+        return new Response(null, {
+          status: 302,
+          headers: { Location: "https://www.bis.org/final" },
+        });
+      },
+    }),
+  );
+  expect(blocked).toMatchObject({
+    code: "network",
+    url: "https://www.bis.org/final",
+  });
+  expect(blocked.message).not.toContain(secret);
+  expect(blocked.url).not.toContain(secret);
+  expect(blockedCalls).toBe(1);
+
+  const requests: string[] = [];
+  const body = await fetchText(
+    "https://example.com/start",
+    {
+      fetch: async (input) => {
+        const request = requestUrl(input);
+        requests.push(request);
+        return request === "https://example.com/start"
+          ? new Response(null, {
+              status: 302,
+              headers: { Location: "https://www.bis.org/final" },
+            })
+          : new Response("public response");
+      },
+    },
+    "xnews-internal-contract-agent",
+  );
+  expect(body).toBe("public response");
+  expect(requests).toEqual(["https://example.com/start", "https://www.bis.org/final"]);
+});
+
+test("redirect policy blocks cross-origin bodies and caller-supplied headers", async () => {
+  const secret = "request-credential-must-not-leak";
+  let postCalls = 0;
+  const postFailure = await captureXnewsError(
+    postJson(
+      "https://example.com/start",
+      { token: secret },
+      {
+        fetch: async () => {
+          postCalls += 1;
+          return new Response(null, {
+            status: 307,
+            headers: { Location: "https://www.bis.org/final" },
+          });
+        },
+      },
+    ),
+  );
+  expect(postFailure).toMatchObject({
+    code: "network",
+    url: "https://www.bis.org/final",
+  });
+  expect(postFailure.message).not.toContain(secret);
+  expect(postCalls).toBe(1);
+
+  for (const header of [
+    "Authorization",
+    "Proxy-Authorization",
+    "Cookie",
+    "X-Api-Key",
+    "Api-Key",
+    "X-Auth-Token",
+  ]) {
+    let calls = 0;
+    const failure = await captureXnewsError(
+      fetchRaw(
+        "https://example.com/start",
+        {
+          fetch: async () => {
+            calls += 1;
+            return new Response(null, {
+              status: 302,
+              headers: { Location: "https://www.bis.org/final" },
+            });
+          },
+        },
+        { headers: { [header]: secret } },
+      ),
+    );
+    expect(failure).toMatchObject({
+      code: "network",
+      url: "https://www.bis.org/final",
+    });
+    expect(failure.message).not.toContain(secret);
+    expect(calls).toBe(1);
+  }
+});
+
+test("redirect policy never reapplies caller-supplied User-Agent identities cross-origin", async () => {
+  const target = "https://www.bis.org/final";
+  const identity = "caller-identity/1.0 secret@example.com";
+
+  let optionCalls = 0;
+  const optionFailure = await captureXnewsError(
+    fetchText("https://example.com/options-user-agent", {
+      userAgent: identity,
+      fetch: async () => {
+        optionCalls += 1;
+        return new Response(null, { status: 302, headers: { Location: target } });
+      },
+    }),
+  );
+  expect(optionFailure).toMatchObject({ code: "network", url: target });
+  expect(optionFailure.message).not.toContain(identity);
+  expect(optionCalls).toBe(1);
+
+  let rawInitCalls = 0;
+  const rawInitFailure = await captureXnewsError(
+    fetchRaw(
+      "https://example.com/raw-init-user-agent",
+      {
+        fetch: async () => {
+          rawInitCalls += 1;
+          return new Response(null, { status: 302, headers: { Location: target } });
+        },
+      },
+      { userAgent: identity },
+    ),
+  );
+  expect(rawInitFailure).toMatchObject({ code: "network", url: target });
+  expect(rawInitFailure.message).not.toContain(identity);
+  expect(rawInitCalls).toBe(1);
+
+  let secFallbackCalls = 0;
+  const secFallbackFailure = await captureXnewsError(
+    fetchText("https://www.sec.gov/Archives/options-user-agent", {
+      userAgent: identity,
+      fetch: async () => {
+        secFallbackCalls += 1;
+        return new Response(null, { status: 302, headers: { Location: target } });
+      },
+    }),
+  );
+  expect(secFallbackFailure).toMatchObject({ code: "network", url: target });
+  expect(secFallbackFailure.message).not.toContain(identity);
+  expect(secFallbackCalls).toBe(1);
+});
+
+test("transport enforces declared and streamed response byte limits", async () => {
+  let declaredLengthCanceled = 0;
+  const declaredLengthBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([115, 101, 99, 114, 101, 116]));
+    },
+    cancel() {
+      declaredLengthCanceled += 1;
+    },
+  });
+  const declaredLengthFailure = await captureXnewsError(
+    fetchText("https://example.com/declared?token=credential-must-not-leak", {
+      maxResponseBytes: 5,
+      fetch: async () =>
+        new Response(declaredLengthBody, {
+          headers: { "Content-Length": "6" },
+        }),
+    }),
+  );
+  expect(declaredLengthFailure.code).toBe("network");
+  expect(declaredLengthFailure.url).toBe("https://example.com/declared?token=%3Credacted%3E");
+  expect(declaredLengthFailure.message).not.toContain("credential-must-not-leak");
+  expect(declaredLengthFailure.message).not.toContain("secret");
+  expect(declaredLengthCanceled).toBe(1);
+
+  let streamedCanceled = 0;
+  const streamedBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([115, 101, 99]));
+      controller.enqueue(new Uint8Array([114, 101, 116]));
+    },
+    cancel() {
+      streamedCanceled += 1;
+    },
+  });
+  const streamedFailure = await captureXnewsError(
+    fetchText("https://example.com/streamed", {
+      maxResponseBytes: 5,
+      fetch: async () => new Response(streamedBody),
+    }),
+  );
+  expect(streamedFailure).toMatchObject({
+    code: "network",
+    url: "https://example.com/streamed",
+  });
+  expect(streamedFailure.message).not.toContain("secret");
+  expect(streamedCanceled).toBe(1);
+
+  const atCallerLimit = await fetchText("https://example.com/override", {
+    maxResponseBytes: 6,
+    fetch: async () =>
+      new Response("secret", {
+        headers: { "Content-Length": "6" },
+      }),
+  });
+  expect(atCallerLimit).toBe("secret");
+});
+
+test("response-size cancellation never delays or replaces the policy failure", async () => {
+  const pendingCancellation = Promise.withResolvers<void>().promise;
+  let pendingDeclaredCancellations = 0;
+  const pendingDeclaredBody = new ReadableStream<Uint8Array>({
+    cancel() {
+      pendingDeclaredCancellations += 1;
+      return pendingCancellation;
+    },
+  });
+  const pendingDeclaredFailure = await captureXnewsError(
+    fetchText("https://example.com/pending-declared", {
+      maxResponseBytes: 1,
+      fetch: async () => new Response(pendingDeclaredBody, { headers: { "Content-Length": "2" } }),
+    }),
+  );
+  expect(pendingDeclaredFailure).toMatchObject({
+    code: "network",
+    url: "https://example.com/pending-declared",
+  });
+  expect(pendingDeclaredFailure.message).toContain("response exceeds 1 byte limit");
+  expect(pendingDeclaredCancellations).toBe(1);
+
+  let rejectedDeclaredCancellations = 0;
+  const rejectedDeclaredBody = new ReadableStream<Uint8Array>({
+    cancel() {
+      rejectedDeclaredCancellations += 1;
+      throw new Error("declared cancellation rejection");
+    },
+  });
+  const rejectedDeclaredFailure = await captureXnewsError(
+    fetchText("https://example.com/rejected-declared", {
+      maxResponseBytes: 1,
+      fetch: async () => new Response(rejectedDeclaredBody, { headers: { "Content-Length": "2" } }),
+    }),
+  );
+  expect(rejectedDeclaredFailure).toMatchObject({
+    code: "network",
+    url: "https://example.com/rejected-declared",
+  });
+  expect(rejectedDeclaredFailure.message).toContain("response exceeds 1 byte limit");
+  expect(rejectedDeclaredFailure.message).not.toContain("cancellation rejection");
+  expect(rejectedDeclaredCancellations).toBe(1);
+
+  let pendingStreamedCancellations = 0;
+  const pendingStreamedBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2]));
+    },
+    cancel() {
+      pendingStreamedCancellations += 1;
+      return pendingCancellation;
+    },
+  });
+  const pendingStreamedFailure = await captureXnewsError(
+    fetchText("https://example.com/pending-streamed", {
+      maxResponseBytes: 1,
+      fetch: async () => new Response(pendingStreamedBody),
+    }),
+  );
+  expect(pendingStreamedFailure).toMatchObject({
+    code: "network",
+    url: "https://example.com/pending-streamed",
+  });
+  expect(pendingStreamedFailure.message).toContain("response exceeds 1 byte limit");
+  expect(pendingStreamedCancellations).toBe(1);
+
+  let rejectedStreamedCancellations = 0;
+  const rejectedStreamedBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2]));
+    },
+    cancel() {
+      rejectedStreamedCancellations += 1;
+      return Promise.reject(new Error("streamed cancellation rejection"));
+    },
+  });
+  const rejectedStreamedFailure = await captureXnewsError(
+    fetchText("https://example.com/rejected-streamed", {
+      maxResponseBytes: 1,
+      fetch: async () => new Response(rejectedStreamedBody),
+    }),
+  );
+  expect(rejectedStreamedFailure).toMatchObject({
+    code: "network",
+    url: "https://example.com/rejected-streamed",
+  });
+  expect(rejectedStreamedFailure.message).toContain("response exceeds 1 byte limit");
+  expect(rejectedStreamedFailure.message).not.toContain("cancellation rejection");
+  expect(rejectedStreamedCancellations).toBe(1);
+});
+
+test("transport rejects a declared response above the default 32 MiB limit without consuming it", async () => {
+  let bodyPulls = 0;
+  let bodyCancellations = 0;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        bodyPulls += 1;
+        controller.enqueue(new Uint8Array([111, 107]));
+        controller.close();
+      },
+      cancel() {
+        bodyCancellations += 1;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+
+  const failure = await captureXnewsError(
+    fetchText("https://example.com/default-limit?token=credential-must-not-leak", {
+      fetch: async () =>
+        new Response(body, {
+          headers: { "Content-Length": "33554433" },
+        }),
+    }),
+  );
+
+  expect(failure).toMatchObject({
+    code: "network",
+    url: "https://example.com/default-limit?token=%3Credacted%3E",
+  });
+  expect(failure.message).not.toContain("credential-must-not-leak");
+  expect(bodyPulls).toBe(0);
+  expect(bodyCancellations).toBe(1);
 });
 
 test("SEC and EMMA policy preconditions fail before network I/O", async () => {
@@ -193,6 +630,37 @@ test("typed errors redact untrusted transport details", async () => {
   expect(failure.message).not.toContain("secret");
   expect(failure.message).not.toContain("Injected header");
   expect(failure.cause).toBeUndefined();
+
+  const malformedUrls = [
+    {
+      value: "https://example.com:invalid/feed?token=malformed-query-secret",
+      secret: "malformed-query-secret",
+    },
+    {
+      value: "https://user:malformed-userinfo-secret@[not-an-ipv6-host]/feed",
+      secret: "malformed-userinfo-secret",
+    },
+    {
+      value: "https://exa\u0000mple.com/control-path-secret",
+      secret: "control-path-secret",
+    },
+  ] as const;
+  let malformedRequests = 0;
+  for (const malformed of malformedUrls) {
+    const malformedFailure = await captureXnewsError(
+      fetchText(malformed.value, {
+        fetch: async () => {
+          malformedRequests += 1;
+          return new Response("unexpected");
+        },
+      }),
+    );
+    expect(malformedFailure).toMatchObject({ code: "config", url: "<invalid-url>" });
+    expect(malformedFailure.message).toContain("<invalid-url>");
+    expect(malformedFailure.message).not.toContain(malformed.secret);
+    expect(malformedFailure.url).not.toContain(malformed.secret);
+  }
+  expect(malformedRequests).toBe(0);
 
   const result = await buildTopicNewsFeedResult({
     query: "Acme",

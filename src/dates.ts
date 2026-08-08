@@ -123,6 +123,20 @@ export function parsePublishedAt(text: string): ParsedPublishedAt | null {
     : { instant: engineParsed.toISOString(), format: "engine" };
 }
 
+/**
+ * Normalizes a real ISO date or date-time to its UTC calendar date.
+ * Returns `null` for invalid dates, non-ISO strings, and invalid `Date` objects.
+ */
+export function normalizeDateOnly(value: string | Date): string | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  }
+  const parsedValue = parsePublishedAt(value);
+  return parsedValue?.format === "date_only" || parsedValue?.format === "iso_8601"
+    ? parsedValue.instant.slice(0, 10)
+    : null;
+}
+
 function parsed(instant: string | null, format: PublishedAtFormat): ParsedPublishedAt | null {
   return instant === null ? null : { instant, format };
 }

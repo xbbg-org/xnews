@@ -34,3 +34,40 @@ function toDateOnly(value: string | Date | undefined): string | undefined {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
 }
+
+/** One curated EDGAR full-text query for management-commentary documents. */
+export interface SecCommentaryQuery {
+  /** Phrase passed to `secFullTextSearchUrl` (quoted server-side). */
+  readonly query: string;
+  readonly forms: readonly string[];
+  readonly description: string;
+}
+
+/**
+ * Curated full-text queries that surface company commentary beyond earnings
+ * calls: prepared remarks, fireside chats, and investor-day materials are
+ * routinely furnished as 8-K exhibits under Reg FD. Feed each entry to
+ * `fetchSecFullTextFilings(entry.query, { forms: entry.forms, ... })`.
+ */
+export const SEC_COMMENTARY_QUERIES = [
+  {
+    query: "prepared remarks",
+    forms: ["8-K"],
+    description: "Prepared management remarks furnished as 8-K exhibits",
+  },
+  {
+    query: "earnings call transcript",
+    forms: ["8-K"],
+    description: "Full call transcripts furnished as 8-K exhibits",
+  },
+  {
+    query: "fireside chat",
+    forms: ["8-K"],
+    description: "Conference fireside-chat transcripts and materials",
+  },
+  {
+    query: "investor day",
+    forms: ["8-K"],
+    description: "Investor-day presentations, transcripts, and related materials",
+  },
+] as const satisfies readonly SecCommentaryQuery[];

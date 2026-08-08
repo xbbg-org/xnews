@@ -136,6 +136,15 @@ test("catalog import graph cannot reach the fetch layer", async () => {
   expect(paths).toContain("catalog.ts");
   expect(paths).toContain("sources/sec.urls.ts");
   expect(paths).toContain("sources/fixedfeeds.urls.ts");
+  expect(paths).toContain("sources/arxiv.urls.ts");
+  expect(paths).toContain("sources/bis.urls.ts");
+  expect(paths).toContain("sources/openalex.urls.ts");
+  expect(paths).toContain("sources/fred.urls.ts");
+  expect(paths).toContain("sources/annasarchive.urls.ts");
+  expect(paths).toContain("sources/internetarchive.urls.ts");
+  expect(paths).toContain("sources/libgen.urls.ts");
+  expect(paths).toContain("sources/openlibrary.urls.ts");
+  expect(paths).toContain("errors.ts");
   expect(paths).not.toContain("http.ts");
   expect(paths.filter((path) => path.startsWith("sources/") && !path.endsWith(".urls.ts"))).toEqual(
     [],

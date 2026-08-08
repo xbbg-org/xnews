@@ -5,7 +5,8 @@ import { normalizeLimit } from "../options.js";
 import { stableId } from "../text.js";
 import type { NewsItem } from "../types.js";
 import { secFullTextSearchUrl, type SecFullTextOptions } from "./secfulltext.urls.js";
-export { secFullTextSearchUrl } from "./secfulltext.urls.js";
+export { SEC_COMMENTARY_QUERIES, secFullTextSearchUrl } from "./secfulltext.urls.js";
+export type { SecCommentaryQuery } from "./secfulltext.urls.js";
 
 export async function fetchSecFullTextFilings(
   query: string,

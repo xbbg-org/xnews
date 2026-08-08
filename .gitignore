@@ -6,3 +6,7 @@ __pycache__/
 *.py[cod]
 .omc/
 *.tgz
+
+# Mirror pools are deployment-local; only the template is committed.
+mirrors.local.txt
+!mirrors.example.txt
