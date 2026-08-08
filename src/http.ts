@@ -412,6 +412,13 @@ async function readResponseBytes(
   return bytes;
 }
 
+/**
+ * A breached ceiling stays `network`, not `config`: `config` is reserved for
+ * preconditions the caller must satisfy before a request is attempted (SEC
+ * identity, EMMA terms, a missing key), and both lanes report those as
+ * `disabled` — "the provider never ran". This request did run and the remote
+ * sent more than was allowed, so the message names the knob instead.
+ */
 function responseTooLargeError(
   method: string,
   url: string,
@@ -419,7 +426,7 @@ function responseTooLargeError(
 ): XnewsFetchError {
   return new XnewsFetchError(
     "network",
-    `${method} ${redactUrl(url)} failed: response exceeds ${maxResponseBytes} byte limit`,
+    `${method} ${redactUrl(url)} failed: response exceeds the ${maxResponseBytes} byte maxResponseBytes limit`,
     { url },
   );
 }

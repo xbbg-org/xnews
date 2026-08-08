@@ -2,16 +2,19 @@
  * Live smoke for the FFIEC CDR data lane: drives the real postback chain to
  * list reporting periods, downloads the latest single-period call-report
  * TSV archive (~6 MB), parses it, and exercises the filtered data source,
- * the ifNewerThan skip, and the news adapter end to end. Catches CDR page
- * markup drift that fixtures cannot.
+ * the ifNewerThan skip, and the news adapter end to end. Then downloads and
+ * parses a UBPR bulk report, the other half of the CDR catalog. Catches CDR
+ * page markup drift that fixtures cannot.
  */
 
 import {
+  downloadFfiecBulkData,
   fetchDataRelease,
   fetchFfiecReportingPeriods,
   ffiecCallDataSource,
   ffiecReleaseToNewsItems,
   ffiecReportingPeriodDate,
+  parseFfiecUbprBundle,
 } from "../src/index.js";
 
 // JPMorgan Chase Bank NA and Bank of America NA lead bank RSSD IDs.
@@ -62,6 +65,19 @@ if (result.status !== "ok" || !result.release) {
   } else {
     console.log(`ok   ifNewerThan ${release.asOf} skipped in ${skipped.durationMs}ms`);
   }
+}
+
+const ubpr = await downloadFfiecBulkData({ product: "ubpr-ratio-four", format: "tsv" }, OPTIONS);
+const bundle = await parseFfiecUbprBundle(ubpr.bytes);
+const firstReport = bundle.reports[0];
+if (firstReport === undefined || firstReport.filings.length === 0) {
+  console.log(`FAIL ubpr-ratio-four parsed ${bundle.reports.length} report(s) with no filings`);
+  failures += 1;
+} else {
+  console.log(
+    `ok   ubpr ${bundle.year} ${bundle.kind}: ${ubpr.filename} ${(ubpr.bytes.byteLength / 1024 / 1024).toFixed(1)} MiB, ` +
+      `${bundle.reports.length} reports, "${firstReport.name}" ${firstReport.columns.length} columns / ${firstReport.filings.length} filings`,
+  );
 }
 
 if (failures > 0) {

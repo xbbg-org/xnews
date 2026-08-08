@@ -450,7 +450,9 @@ test("response-size cancellation never delays or replaces the policy failure", a
     code: "network",
     url: "https://example.com/pending-declared",
   });
-  expect(pendingDeclaredFailure.message).toContain("response exceeds 1 byte limit");
+  expect(pendingDeclaredFailure.message).toContain(
+    "response exceeds the 1 byte maxResponseBytes limit",
+  );
   expect(pendingDeclaredCancellations).toBe(1);
 
   let rejectedDeclaredCancellations = 0;
@@ -470,7 +472,9 @@ test("response-size cancellation never delays or replaces the policy failure", a
     code: "network",
     url: "https://example.com/rejected-declared",
   });
-  expect(rejectedDeclaredFailure.message).toContain("response exceeds 1 byte limit");
+  expect(rejectedDeclaredFailure.message).toContain(
+    "response exceeds the 1 byte maxResponseBytes limit",
+  );
   expect(rejectedDeclaredFailure.message).not.toContain("cancellation rejection");
   expect(rejectedDeclaredCancellations).toBe(1);
 
@@ -494,7 +498,9 @@ test("response-size cancellation never delays or replaces the policy failure", a
     code: "network",
     url: "https://example.com/pending-streamed",
   });
-  expect(pendingStreamedFailure.message).toContain("response exceeds 1 byte limit");
+  expect(pendingStreamedFailure.message).toContain(
+    "response exceeds the 1 byte maxResponseBytes limit",
+  );
   expect(pendingStreamedCancellations).toBe(1);
 
   let rejectedStreamedCancellations = 0;
@@ -517,7 +523,9 @@ test("response-size cancellation never delays or replaces the policy failure", a
     code: "network",
     url: "https://example.com/rejected-streamed",
   });
-  expect(rejectedStreamedFailure.message).toContain("response exceeds 1 byte limit");
+  expect(rejectedStreamedFailure.message).toContain(
+    "response exceeds the 1 byte maxResponseBytes limit",
+  );
   expect(rejectedStreamedFailure.message).not.toContain("cancellation rejection");
   expect(rejectedStreamedCancellations).toBe(1);
 });
