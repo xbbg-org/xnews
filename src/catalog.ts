@@ -361,6 +361,35 @@ export type {
   FfiecGeocodePoint,
   FfiecGeocodeServiceBinding,
 } from "./sources/ffieccensus.urls.js";
+export {
+  FRY9_ARCHIVE_DOWNLOAD_URL,
+  FRY9_DATA_DICTIONARY_URL,
+  FRY9_FINANCIAL_DATA_URL,
+  FRY9_FIRST_YEAR,
+  FRY9_PROVIDER_ID,
+  FRY9_REPORTS,
+  fry9ArchiveName,
+  fry9ArchiveUrl,
+  fry9FinancialDataPageUrl,
+  fry9PeriodReports,
+  fry9ReportDefinition,
+  fry9ReportingPeriod,
+  fry9ReportPeriod,
+} from "./sources/fry9.urls.js";
+export type {
+  Fry9Cadence,
+  Fry9LineItemFamily,
+  Fry9Report,
+  Fry9ReportDefinition,
+} from "./sources/fry9.urls.js";
+
+export {
+  FFIEC_E16_DATA_PATH,
+  FFIEC_E16_INDEX_URL,
+  FFIEC_E16_PROVIDER_ID,
+  ffiecE16FormatFromUrl,
+} from "./sources/ffiece16.urls.js";
+export type { FfiecE16ReleaseEntry, FfiecE16ReleaseFormat } from "./sources/ffiece16.urls.js";
 
 /**
  * Operational facts a consumer needs before pointing a scheduler at a
@@ -490,6 +519,19 @@ export const FFIEC_CENSUS_PROVIDER_POLICY: ProviderPolicy = {
   termsUrl: "https://www.ffiec.gov/disclaimer",
   notes:
     "FFIEC publishes the census flat file annually for use with the matching HMDA/CRA activity year; the census year identifies that year's geography and income denominator, so substituting a stale file changes tract classifications and denominators. The 2026 ZIP was 95,033,841 bytes and inflated to a 301,371,095-byte, 1,212-field CSV. The archive and geomap rejected xnews's bot-shaped default User-Agent during live probes, so this adapter uses a browser-shaped default. Geomap derives a public ArcGIS token from its service manifest rather than requiring a caller key. FFIEC documents no numeric request-rate ceiling.",
+};
+export const FRY9_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  termsUrl: "https://www.federalreserve.gov/disclaimer.htm",
+  notes:
+    "NPW publishes keyless combined quarterly BHCF ZIPs by direct GET and refreshes them around 05:00 EST each weekday. FR Y-9C and Y-9LP are quarterly; FR Y-9SP is semiannual. The page warns that filings may remain incomplete or change until the 45-calendar-day Y-9 deadline. Live 2025-09-30 and 2025-12-31 probes found 664,462-byte and 1,472,610-byte ZIPs expanding to 2,455,902 and 11,226,479 bytes. FR Y-9C is consolidated while FR Y-9LP is parent-only; they are different accounting scopes and must not be summed. No API key, session cookie, authentication, or numeric request-rate ceiling is documented, but ffiec.gov's edge answers a first cold request with an HTML block page under HTTP 403 and then serves subsequent requests, so treat an isolated 403 as retryable rather than as a missing credential.",
+};
+
+export const FFIEC_E16_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  termsUrl: "https://www.ffiec.gov/disclaimer",
+  notes:
+    "FFIEC publishes the keyless E.16 country-exposure release quarterly from aggregated FFIEC 009 filings. It is a cleansed population-level product, not filer-level data: All Banks contains the LFI and All Others populations, so those groups must not be summed. The verified 2026-03-31 bare XLSX was 202,996 bytes; the 2024-12-31 ZIP wrapper was 175,217 bytes and contained one roughly 181 KiB XLSX. Filenames and link labels are irregular, so consumers must discover links from the index and use the workbook's stated period.",
 };
 
 export const PROVIDER_POLICIES: Partial<Record<NewsProvider, ProviderPolicy>> = {

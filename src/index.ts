@@ -64,6 +64,8 @@ export { FFIEC_002_PROVIDER_POLICY } from "./catalog.js";
 export { CRA_PROVIDER_POLICY } from "./catalog.js";
 export { HMDA_PROVIDER_POLICY } from "./catalog.js";
 export { FFIEC_CENSUS_PROVIDER_POLICY } from "./catalog.js";
+export { FRY9_PROVIDER_POLICY } from "./catalog.js";
+export { FFIEC_E16_PROVIDER_POLICY } from "./catalog.js";
 export { PUBLISHED_AT_PARSER_VERSION, parsePublishedAt } from "./dates.js";
 export { XnewsFetchError } from "./http.js";
 export { NEWS_ITEM_ID_SCHEME_VERSION } from "./text.js";
@@ -96,6 +98,8 @@ export { extractDjvuText } from "./djvu.js";
 export type { DjvuText } from "./djvu.js";
 export { MAX_ZIP_UNCOMPRESSED_BYTES, readZipEntries } from "./zip.js";
 export type { ZipEntry } from "./zip.js";
+export { excelSerialDateToIso, readXlsx } from "./xlsx.js";
+export type { XlsxCell, XlsxCellValue, XlsxSheet, XlsxWorkbook } from "./xlsx.js";
 export { parseCsvRecords, parseCsvTable } from "./csv.js";
 
 export type { MoonshineAsrOptions, MoonshineModelArch } from "./asr/moonshine.js";
@@ -851,3 +855,66 @@ export type {
   FfiecGeocodeServiceBinding,
   FfiecTractIncomeLevel,
 } from "./sources/ffieccensus.js";
+export {
+  downloadFry9Archive,
+  fetchFry9Data,
+  fetchFry9Page,
+  fetchFry9Periods,
+  FRY9_ARCHIVE_DOWNLOAD_URL,
+  FRY9_ARCHIVE_MAX_BYTES,
+  FRY9_DATA_DICTIONARY_URL,
+  FRY9_FINANCIAL_DATA_URL,
+  FRY9_FIRST_YEAR,
+  FRY9_PROVIDER_ID,
+  FRY9_REPORTS,
+  fry9ArchiveName,
+  fry9ArchiveUrl,
+  fry9DataSource,
+  fry9FinancialDataPageUrl,
+  fry9PeriodReports,
+  fry9ReportDefinition,
+  fry9ReportingPeriod,
+  fry9ReportPeriod,
+  parseFry9Archive,
+  parseFry9Page,
+  parseFry9Text,
+} from "./sources/fry9.js";
+export type {
+  Fry9Cadence,
+  Fry9DataOptions,
+  Fry9Download,
+  Fry9LineItemFamily,
+  Fry9Page,
+  Fry9ParseOptions,
+  Fry9Period,
+  Fry9Report,
+  Fry9ReportDefinition,
+  Fry9Row,
+} from "./sources/fry9.js";
+export {
+  fetchFfiecE16Data,
+  fetchFfiecE16Release,
+  FFIEC_E16_DATA_PATH,
+  FFIEC_E16_INDEX_URL,
+  FFIEC_E16_MAX_BYTES,
+  FFIEC_E16_PROVIDER_ID,
+  ffiecE16DataSource,
+  ffiecE16FormatFromUrl,
+  listFfiecE16Releases,
+  parseFfiecE16Index,
+  parseFfiecE16Workbook,
+} from "./sources/ffiece16.js";
+export type {
+  FfiecE16CountryExposureRow,
+  FfiecE16DataOptions,
+  FfiecE16ExposureMeasure,
+  FfiecE16MeasureName,
+  FfiecE16ParseOptions,
+  FfiecE16Population,
+  FfiecE16Release,
+  FfiecE16ReleaseEntry,
+  FfiecE16ReleaseFormat,
+  FfiecE16RowKind,
+  FfiecE16Table,
+  FfiecE16Workbook,
+} from "./sources/ffiece16.js";

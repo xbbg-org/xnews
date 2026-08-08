@@ -19,6 +19,8 @@ export type { SubjectMatchItem, SubjectMatchTerms } from "./sources/match.js";
 export { parseCsvRecords, parseCsvTable } from "./csv.js";
 export { MAX_ZIP_UNCOMPRESSED_BYTES, readZipEntries } from "./zip.js";
 export type { ZipEntry } from "./zip.js";
+export { excelSerialDateToIso, readXlsx } from "./xlsx.js";
+export type { XlsxCell, XlsxCellValue, XlsxSheet, XlsxWorkbook } from "./xlsx.js";
 
 export { parseAlphaVantageTranscript } from "./sources/alphavantage.js";
 export type { AlphaVantageTranscript, AlphaVantageTranscriptTurn } from "./sources/alphavantage.js";
@@ -171,3 +173,16 @@ export type {
   FfiecGeocode,
   FfiecTractIncomeLevel,
 } from "./sources/ffieccensus.js";
+export { parseFry9Archive, parseFry9Page, parseFry9Text } from "./sources/fry9.js";
+export type { Fry9Page, Fry9ParseOptions, Fry9Period, Fry9Row } from "./sources/fry9.js";
+export { parseFfiecE16Index, parseFfiecE16Workbook } from "./sources/ffiece16.js";
+export type {
+  FfiecE16CountryExposureRow,
+  FfiecE16ExposureMeasure,
+  FfiecE16MeasureName,
+  FfiecE16ParseOptions,
+  FfiecE16Population,
+  FfiecE16RowKind,
+  FfiecE16Table,
+  FfiecE16Workbook,
+} from "./sources/ffiece16.js";

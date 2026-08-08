@@ -21,7 +21,7 @@ Requires Node 24 or newer. The package is **ESM-only**: it exports ESM from `dis
 ## Subpath exports
 
 - `@xbbg/xnews/catalog` exports URL builders for every provider, `FIXED_FEEDS`, `PROVIDER_POLICIES`, and `WORKS_PROVIDER_POLICIES`. It is structurally network-free: its import graph never reaches the fetch layer.
-- `@xbbg/xnews/parsers` exports pure parsers, the shared `readZipEntries` and `parseCsvRecords`/`parseCsvTable` readers, and `parsePublishedAt`.
+- `@xbbg/xnews/parsers` exports pure parsers, the shared `readZipEntries`, `readXlsx`, and `parseCsvRecords`/`parseCsvTable` readers, and `parsePublishedAt`.
 - `@xbbg/xnews/asr` exports transcription APIs.
 
 ## Company feed
@@ -645,6 +645,50 @@ const source = ffiec002DataSource({ rssdId: 112819, reportingDate: "2026-06-30" 
 ```
 
 Because it is per institution and per quarter, there is no bulk product: get the filer list from `nic` (branch entities carry their own RSSD IDs) and request the quarters you need. The response is a three-column `ItemName,Description,Value` CSV, so line items arrive with their MDRM code and label; an RSSD that does not match the request fails closed rather than returning another bank's balance sheet.
+
+### FR Y-9 holding-company financials (`fry9`)
+
+What sits _above_ the insured bank. NPW publishes one combined caret-delimited archive per quarter — not one per report — so `fry9c` (consolidated, quarterly), `fry9lp` (parent-only, quarterly), and `fry9sp` (small holding companies, semiannual) resolve to the same download and are separated by line-item family after extraction.
+
+```ts
+import { fetchFry9Data, fetchFry9Periods, fry9DataSource } from "@xbbg/xnews";
+
+const periods = await fetchFry9Periods(2026); // what NPW offers, per form
+const release = await fetchFry9Data("fry9c", { period: "2026-06-30", rssdIds: [1025309] });
+// release.asOf === "2026-06-30"; 1,628 non-empty MDRM items for BANK OF HAWAII CORPORATION
+
+const source = fry9DataSource("fry9c", { rssdIds: [1025309] });
+```
+
+`RSSD9001` is the join key, so Y-9C parent figures line up with the Call Report's subsidiary figures and with `nic` structure rows. Values stay verbatim strings like `FfiecCallRow.values`. Three upstream quirks are handled rather than assumed away: the file is Windows-1252, text fields can contain unquoted physical line breaks that must be rejoined before the record is split, and the header carries 2,224 MDRM columns. **Y-9C is consolidated and Y-9LP is parent-only — different accounting scopes, never summed.** Filings can change until the 45-day deadline, so a quarter fetched early is provisional.
+
+### FFIEC E.16 country exposure (`ffiec-e16`)
+
+Quarterly cross-border claims of U.S. banking organizations, aggregated from FFIEC 009 filings. FFIEC publishes it as a spreadsheet, so xnews reads XLSX natively — the package still has zero dependencies.
+
+```ts
+import { fetchFfiecE16Data, ffiecE16DataSource, listFfiecE16Releases } from "@xbbg/xnews";
+
+const releases = await listFfiecE16Releases(); // 45 quarters, 2015-03-31 onward
+const release = await fetchFfiecE16Data();
+// asOf 2026-03-31; each row carries population, table, countryOrRegion, rowKind,
+// and a typed `measures` list — e.g. all-banks/Table 1 BELGIUM, region "G-10 and Luxembourg"
+
+const source = ffiecE16DataSource();
+```
+
+#### Reading XLSX
+
+`readXlsx` is the shared spreadsheet reader behind E.16, exported from `@xbbg/xnews/parsers` alongside `readZipEntries` and `parseCsvRecords`.
+
+```ts
+import { excelSerialDateToIso, readXlsx } from "@xbbg/xnews/parsers";
+
+const workbook = await readXlsx(bytes);
+workbook.sheets[1]?.rows[3]?.[2]; // dense: a skipped cell keeps its column index
+```
+
+It resolves sheets through `xl/_rels/workbook.xml.rels` in workbook order, concatenates rich-text runs (FFIEC's shared strings are split across `<r>` runs, which a naive `<si><t>` match silently truncates), honors `xml:space="preserve"`, and keeps blanks positional so a row never shifts left. Formula cells yield their cached value; styles, charts, and formula evaluation are out of scope. Because a date in XLSX is a number under a format id, date cells come back as Excel serials — convert explicitly with `excelSerialDateToIso`.
 
 ## Book catalogs (Open Library, Internet Archive, Library Genesis, Anna's Archive)
 

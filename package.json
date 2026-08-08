@@ -94,6 +94,8 @@
     "smoke:hmda": "bun run ./scripts/smoke-hmda.ts",
     "smoke:cra": "bun run ./scripts/smoke-cra.ts",
     "smoke:nic": "bun run ./scripts/smoke-nic.ts",
+    "smoke:fry9": "bun run ./scripts/smoke-fry9.ts",
+    "smoke:ffiec-e16": "bun run ./scripts/smoke-ffiec-e16.ts",
     "smoke:packaged-install": "bun run ./scripts/smoke-packaged-install.ts",
     "changelog:section": "bun run ./scripts/changelog.ts section",
     "release": "bun run ./scripts/release.ts"
