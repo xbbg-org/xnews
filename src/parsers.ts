@@ -106,3 +106,68 @@ export {
   parseYoutubeCaptionTracks,
   parseYoutubeTranscriptSegments,
 } from "./sources/youtubetranscript.js";
+export {
+  parseNicBulkArchive,
+  parseNicBulkPage,
+  parseNicInstitutions,
+  parseNicRelationships,
+  parseNicTransformations,
+} from "./sources/nic.js";
+export type {
+  NicBulkPage,
+  NicInstitution,
+  NicPageProduct,
+  NicRecord,
+  NicRelationship,
+  NicTransformation,
+} from "./sources/nic.js";
+export { parseFfiec002Report } from "./sources/ffiec002.js";
+export type {
+  Ffiec002CsvRow,
+  Ffiec002Institution,
+  Ffiec002LineItem,
+  Ffiec002ParseOptions,
+  Ffiec002Report,
+} from "./sources/ffiec002.js";
+
+export {
+  parseCraAvailableYears,
+  parseCraFlatFileArchive,
+  parseCraFlatFileCatalog,
+  parseCraRecord,
+} from "./sources/cra.js";
+export type {
+  CraAggregateLenderRecordType,
+  CraAggregateLenderRow,
+  CraAggregateLoanRecordType,
+  CraAggregateLoanRow,
+  CraArchiveParseOptions,
+  CraDisclosureAssessmentActivityRow,
+  CraDisclosureAssessmentAreaRow,
+  CraDisclosureCommunityDevelopmentRow,
+  CraDisclosureLoanRecordType,
+  CraDisclosureLoanRow,
+  CraFlatFile,
+  CraFlatFileCatalogEntry,
+  CraRow,
+  CraRowBase,
+  CraTransmittalRow,
+} from "./sources/cra.js";
+export {
+  parseHmdaAggregations,
+  parseHmdaFilers,
+  parseHmdaLoanCsv,
+  parseHmdaLoanPipe,
+} from "./sources/hmda.js";
+export type { HmdaAggregation, HmdaFiler, HmdaLoanRecord } from "./sources/hmda.js";
+export {
+  parseFfiecCensusArchive,
+  parseFfiecCensusCsv,
+  parseFfiecGeocode,
+} from "./sources/ffieccensus.js";
+export type {
+  FfiecCensusParseOptions,
+  FfiecCensusTract,
+  FfiecGeocode,
+  FfiecTractIncomeLevel,
+} from "./sources/ffieccensus.js";

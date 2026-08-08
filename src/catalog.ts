@@ -267,6 +267,100 @@ export {
 } from "./sources/youtube.urls.js";
 export type { CommentaryChannelDefinition } from "./sources/youtube.urls.js";
 export { youtubeWatchUrl } from "./sources/youtubetranscript.urls.js";
+export {
+  NIC_BULK_PRODUCTS,
+  NIC_DATA_DICTIONARY_URL,
+  NIC_DATA_DOWNLOAD_URL,
+  NIC_REFRESH_FAQ_URL,
+  nicBulkDownloadUrl,
+  nicBulkProductDefinition,
+} from "./sources/nic.urls.js";
+export type {
+  NicBulkProduct,
+  NicBulkProductDefinition,
+  NicBulkRecordKind,
+} from "./sources/nic.urls.js";
+export {
+  FFIEC_002_INSTITUTION_PROFILE_URL,
+  FFIEC_002_PROVIDER_ID,
+  FFIEC_002_REPORT_CSV_URL,
+  FFIEC_002_REPORT_SERIES,
+  ffiec002InstitutionProfileUrl,
+  ffiec002ReportingDate,
+  ffiec002ReportCsvUrl,
+} from "./sources/ffiec002.urls.js";
+export type { Ffiec002Date, Ffiec002ReportParams } from "./sources/ffiec002.urls.js";
+export {
+  CRA_DATA_PRODUCTS_URL,
+  CRA_DISCLAIMER_URL,
+  CRA_FLAT_FILE_KINDS,
+  CRA_FLAT_FILE_YEARS,
+  CRA_FLAT_FILES_PAGE_URL,
+  craFlatFileDefinition,
+  craFlatFileSpecsUrl,
+  craFlatFileUrl,
+} from "./sources/cra.urls.js";
+export type { CraFlatFileDefinition, CraFlatFileKind } from "./sources/cra.urls.js";
+export {
+  HMDA_AGGREGATION_DIMENSIONS,
+  HMDA_DATA_BROWSER_API_BASE_URL,
+  HMDA_DATA_BROWSER_API_DOCUMENTATION_URL,
+  HMDA_DATA_BROWSER_URL,
+  HMDA_MODIFIED_LAR_DOCUMENTATION_URL,
+  hmdaAggregationsUrl,
+  hmdaCountUrl,
+  hmdaCsvUrl,
+  hmdaFilersUrl,
+  hmdaNationwideAggregationsUrl,
+  hmdaNationwideCsvUrl,
+  hmdaNationwidePipeUrl,
+  hmdaPipeUrl,
+} from "./sources/hmda.urls.js";
+export type {
+  HmdaActionTaken,
+  HmdaAggregationDimension,
+  HmdaApplicantAge,
+  HmdaConstructionMethod,
+  HmdaCountQuery,
+  HmdaDimensionFilters,
+  HmdaDwellingCategory,
+  HmdaEthnicity,
+  HmdaFilerQuery,
+  HmdaFilterList,
+  HmdaFilterSet,
+  HmdaGeographyFilters,
+  HmdaLienStatus,
+  HmdaLoanProduct,
+  HmdaLoanPurpose,
+  HmdaLoanType,
+  HmdaNationwideQuery,
+  HmdaQuery,
+  HmdaRace,
+  HmdaSex,
+  HmdaTotalUnits,
+  HmdaYear,
+  HmdaYearFilter,
+} from "./sources/hmda.urls.js";
+export {
+  FFIEC_CENSUS_ARCHIVES,
+  FFIEC_CENSUS_DICTIONARIES,
+  FFIEC_CENSUS_FLAT_FILES_URL,
+  FFIEC_CENSUS_YEARS,
+  FFIEC_GEOCODE_OUT_FIELDS,
+  FFIEC_GEOMAP_SERVICES_URL,
+  FFIEC_GEOMAP_URL,
+  ffiecCensusArchiveUrl,
+  ffiecCensusDictionaryUrl,
+  ffiecCensusPeriodEnd,
+  ffiecGeocodeCandidateUrl,
+  ffiecGeocodeTractUrl,
+  isFfiecCensusYear,
+} from "./sources/ffieccensus.urls.js";
+export type {
+  FfiecCensusYear,
+  FfiecGeocodePoint,
+  FfiecGeocodeServiceBinding,
+} from "./sources/ffieccensus.urls.js";
 
 /**
  * Operational facts a consumer needs before pointing a scheduler at a
@@ -363,6 +457,39 @@ export const HF_PAPERS_PROVIDER_POLICY: ProviderPolicy = {
 export const OSF_PROVIDER_POLICY: ProviderPolicy = {
   notes:
     "OSF JSON:API v2. Unauthenticated traffic is throttled; pages cap at 100 records. Preprint licenses vary per provider and per record.",
+};
+
+export const NIC_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  termsUrl: "https://www.federalreserve.gov/disclaimer.htm",
+  notes:
+    "NIC says Structure Data Download is refreshed daily and describes the snapshots as non-confidential public data, without stating a redistribution license. The five keyless direct-GET CSV ZIPs require neither an ASP.NET postback nor a caller-managed session cookie and currently span about 0.6-14 MiB; xnews allows 64 MiB. No numeric request-rate ceiling is documented. The page's last-update date is the snapshot as-of date; Attributes #ID_RSSD and Relationships parent/offspring RSSD IDs join to FFIEC Call Reports' IDRSSD.",
+};
+export const FFIEC_002_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  termsUrl: "https://www.federalreserve.gov/disclaimer.htm",
+  notes:
+    "NPW publishes keyless institution-level FFIEC 002 CSVs, one RSSD ID and reporting quarter per request; it does not offer a bulk 002 archive. Board information is public domain unless indicated otherwise, should cite the Board, and is supplied without warranty. No numeric request-rate ceiling is documented.",
+};
+export const CRA_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  termsUrl: "https://www.ffiec.gov/disclaimer",
+  notes:
+    "FFIEC says CRA data are generally released annually by August following the activity year, with annual prior-year resubmission files beginning in February 2026. The original 2024 ZIPs were 33,707 bytes (transmittal), 5,610,753 bytes (aggregate), and 22,816,732 bytes (disclosure). Aggregate and disclosure flat files reproduce derived report tables, not loan-level records. The CRA product and flat-file pages document no numeric request-rate ceiling.",
+};
+export const HMDA_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  requiresDeclaredUserAgent: true,
+  notes:
+    "Free, keyless HMDA Data Browser API. Its documentation states no numeric request-rate ceiling or API-specific terms; schedule conservatively because exports can be very large. The CFPB edge rejects xnews's bot-shaped default User-Agent, so this adapter uses a browser-shaped default. Public loan-level exports are the modified LAR: CFPB documents 27 fields redacted and 6 fields modified for applicant and borrower privacy.",
+};
+
+export const FFIEC_CENSUS_PROVIDER_POLICY: ProviderPolicy = {
+  requiresApiKey: false,
+  requiresDeclaredUserAgent: true,
+  termsUrl: "https://www.ffiec.gov/disclaimer",
+  notes:
+    "FFIEC publishes the census flat file annually for use with the matching HMDA/CRA activity year; the census year identifies that year's geography and income denominator, so substituting a stale file changes tract classifications and denominators. The 2026 ZIP was 95,033,841 bytes and inflated to a 301,371,095-byte, 1,212-field CSV. The archive and geomap rejected xnews's bot-shaped default User-Agent during live probes, so this adapter uses a browser-shaped default. Geomap derives a public ArcGIS token from its service manifest rather than requiring a caller key. FFIEC documents no numeric request-rate ceiling.",
 };
 
 export const PROVIDER_POLICIES: Partial<Record<NewsProvider, ProviderPolicy>> = {

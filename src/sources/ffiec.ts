@@ -48,6 +48,14 @@ export type {
   FfiecReportingPeriod,
 } from "./ffiec.urls.js";
 
+/**
+ * Response ceiling for a CDR bulk archive. The TSV products run 1-18 MB, but
+ * the CDR serves UBPR single-period ratios only as XBRL at about 100 MB, so
+ * the shared 32 MiB default would reject a product the page legitimately
+ * offers. Sized for headroom as the filer count and schedule set grow.
+ */
+export const FFIEC_BULK_MAX_BYTES = 512 * 1024 * 1024;
+
 /** Parsed state of the CDR bulk download page after any postback. */
 export interface FfiecBulkPage {
   /** Hidden ASP.NET form fields to echo back on the next postback. */
@@ -872,7 +880,9 @@ async function runBulkDownload(
       period.formValue,
       format,
     ),
-    options,
+    // Only the final POST returns an archive; the postback pages stay under
+    // the shared ceiling, and a caller-set limit still wins.
+    { ...options, maxResponseBytes: options.maxResponseBytes ?? FFIEC_BULK_MAX_BYTES },
     session,
   );
   const contentType = (result.contentType ?? "").toLowerCase();

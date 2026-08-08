@@ -426,9 +426,9 @@ console.log(result.items.length);
 
 A watchlist result includes per-subject `NewsFeedResult` values, one merged top-level `items` list, flattened provider rows, flattened warnings, and a top-level `partial` flag.
 
-## Structured data releases (FRED, CFTC COT, FFIEC call reports, DTCC swaps)
+## Structured data releases (FRED, CFTC COT, FFIEC bank data, DTCC swaps)
 
-News is one lane; scheduled structured data is another. A `DataSource` binds a provider dataset to its transport, `fetchDataRelease` wraps any source in the same non-throwing status taxonomy as `ProviderResult`, and `createDataReleaseWatcher` polls until a release with a new `asOf` date — or, for sequenced sources like DTCC intraday slices, a greater `sequence` — appears. Built-in sources cover FRED series, CFTC Commitments of Traders, FFIEC Call Reports, and DTCC swap dissemination.
+News is one lane; scheduled structured data is another. A `DataSource` binds a provider dataset to its transport, `fetchDataRelease` wraps any source in the same non-throwing status taxonomy as `ProviderResult`, and `createDataReleaseWatcher` polls until a release with a new `asOf` date — or, for sequenced sources like DTCC intraday slices, a greater `sequence` — appears. Built-in sources cover FRED series, CFTC Commitments of Traders, DTCC swap dissemination, and the FFIEC bank-data family: Call Reports and UBPR, HMDA, CRA, the census flat files, NIC institution structure, and FFIEC 002 foreign-branch filings.
 
 ### FRED economic observations (`fred`)
 
@@ -521,7 +521,7 @@ One caveat by design: the watcher and the `ifNewerThan` skip both key on the rep
 
 Beyond the data lane, the whole CDR bulk catalog is reachable: `downloadFfiecBulkData({ product, period?, format? })` fetches any of the six bulk products (single-period call reports, the four-period subset, UBPR ratios/ranks/stats) in its TSV or XBRL format, `fetchFfiecReportingPeriods` lists the offered quarters, and the pure parsers `parseFfiecCallBundle`, `parseFfiecFourPeriodBundle`, and `parseFfiecUbprBundle` turn TSV archives into typed bundles (institutions, schedules, MDRM columns, filings). `ffiecReleaseToNewsItems` bridges a release into the news lane as a single `kind: "data"` item, next to the `ffiec` announcements feed. The network-free product registry, postback form builders, and period helpers live in `@xbbg/xnews/catalog`; `PROVIDER_POLICIES["ffiec-cdr"]` records the session-cookie requirement and archive sizes.
 
-Measured against the live CDR, the TSV archives are small enough for the default response ceiling — all UBPR ratios for a year is 14.7 MB, all ranks 17.3 MB, stats 0.6 MB, the four-period call subset 1.3 MB, single-period call reports about 6 MB. The one exception is `ubpr-ratio-single`, which the CDR offers **only as XBRL** at about 100 MB: it needs `maxResponseBytes` raised past the 32 MiB default, and no XBRL parser ships, so you get verbatim bytes rather than a typed bundle. Every other product has a TSV parser.
+Measured against the live CDR: all UBPR ratios for a year is 14.7 MB, all ranks 17.3 MB, stats 0.6 MB, the four-period call subset 1.3 MB, single-period call reports about 6 MB — and `ubpr-ratio-single`, which the CDR offers **only as XBRL**, about 100 MB. The archive download therefore raises its own ceiling to `FFIEC_BULK_MAX_BYTES` (512 MiB) instead of inheriting the shared 32 MiB response default, the same way `downloadFile` raises it for scans; a caller-supplied `maxResponseBytes` still wins. No XBRL parser ships, so the XBRL products give you verbatim bytes rather than a typed bundle; every product the CDR offers as TSV has one.
 
 ### DTCC swap dissemination (`dtcc-sdr`)
 
@@ -553,6 +553,98 @@ for await (const result of createDataReleaseWatcher(source, { intervalMs: 60_000
 ```
 
 Every `(agency, assetClass)` pair uses the same endpoint scheme — `agency` is `"cftc"` or `"sec"`, `assetClass` is `"credits"` (default), `"rates"`, `"equities"`, `"forex"`, or `"commodities"`. Events carry the identity, lifecycle, product, and price columns as typed fields (`disseminationId`, `lineageId`, `executionTimestamp`, `notionalAmountLeg1`, `spreadLeg1`, `price`, `uniqueProductIdentifier`, …) and the full 100+ column row verbatim in `raw`. Numeric-looking values stay strings: DTCC renders notionals with thousands separators and caps large trades with a trailing `+` (`"25,000,000+"`) under block-trade rules, so number parsing is the consumer's decision. `dtccCumulativeDataSource` binds the end-of-day stream to the same watcher machinery, and `dtccReleaseToNewsItems` bridges a release into the news lane as a single `kind: "data"` summary item. Like the other data providers, `dtcc-sdr` never participates in company/topic feeds. The slice catalog only retains the most recent days — anything older must come from the cumulative files (`PROVIDER_POLICIES["dtcc-sdr"]` records the details); the network-free URL builders and file-name parser live in `@xbbg/xnews/catalog`, and the pure parsers (`parseDtccSliceCatalog`, `parseDtccTradeCsv`, `parseDtccTradeZip`) in `@xbbg/xnews/parsers`.
+
+### HMDA mortgage applications (`hmda`)
+
+HMDA moved to CFPB hosting; xnews reads the Data Browser API at `ffiec.cfpb.gov`, free and keyless. Its edge answers a bot-shaped User-Agent with `403`, so these fetchers default to the package's browser-shaped string and a caller `userAgent` still wins.
+
+```ts
+import { fetchHmdaCount, fetchHmdaFilers, fetchHmdaLoanRecords, hmdaDataSource } from "@xbbg/xnews";
+
+const dc = await fetchHmdaCount({ years: [2023], states: ["DC"] });
+// { count: 17474, sum: 11458390000, dimensions: {} }
+
+const filers = await fetchHmdaFilers({ years: [2023], states: ["DC"] });
+const loans = await fetchHmdaLoanRecords({
+  years: [2023],
+  states: ["DC"],
+  leis: ["549300AG64NHILB7ZP05"],
+  actions_taken: [1],
+});
+// loans[0].raw holds all 99 modified-LAR columns verbatim
+
+// Watch for a newly published data year: asOf is the year end.
+const source = hmdaDataSource(2023, { states: ["DC"], actions_taken: [1] });
+```
+
+`fetchHmdaAggregations` groups by one or two dimensions — the service rejects three or more with `provide-two-or-less-filter-criteria`, so the data source validates that before dialing. `HMDA_AGGREGATION_DIMENSIONS` lists the twelve groupable fields (`actions_taken`, `loan_types`, `loan_purposes`, `lien_statuses`, `construction_methods`, `dwelling_categories`, `loan_products`, `total_units`, `races`, `ethnicities`, `sexes`, `ageapplicant`); an unknown field is refused rather than silently ignored. Nationwide variants drop geography, and every row-level endpoint has both CSV and pipe forms. Remember the public LAR is a _modified_ LAR: CFPB perturbs and truncates fields to protect applicant privacy, so it does not reconcile to a lender's own book.
+
+### CRA small-business and small-farm lending (`cra`)
+
+FFIEC publishes CRA activity as annual flat-file archives of fixed-width records, 1996 through the latest year. The old `craflatfiles.htm` path is gone; xnews reads the current `/data/cra/flat-files` catalog page, so `year: "latest"` resolves against what FFIEC actually links today rather than a hardcoded guess.
+
+```ts
+import { craDataSource, fetchCraAvailableYears, fetchCraFlatFile } from "@xbbg/xnews";
+
+const years = await fetchCraAvailableYears(); // newest first
+const aggregate = await fetchCraFlatFile(2024, "aggregate");
+// aggregate.rows: typed union discriminated by CRA record type; rawRecord keeps the line
+
+const source = craDataSource("disclosure", { year: "latest" });
+```
+
+Three kinds ship: `transmittal` (the filer roster, 34 KB), `aggregate` (5.6 MB compressed, 53 MB of records), and `disclosure` (22.8 MB compressed, 366 MB of records). Records are positional and discriminated by a record-type code; an unrecognized code fails the parse instead of dropping the row, and the 1996-2003 layouts are handled separately from the current ones because the field offsets differ. Downloads raise their own ceiling to `CRA_ARCHIVE_MAX_BYTES`, and aggregate/disclosure products are derived tables — CRA publishes no loan-level records.
+
+### FFIEC census tracts and geocoding (`ffiec-census`)
+
+Two different things, kept apart. The annual census flat file is a dated release; geocoding is a lookup, so it is not forced into a `DataSource`.
+
+```ts
+import { fetchFfiecCensus, fetchFfiecGeocode, ffiecCensusDataSource } from "@xbbg/xnews";
+
+const release = await fetchFfiecCensus(2026, { limit: 1000 });
+// release.asOf === "2026-12-31"; rows carry tract income level, population, housing
+
+const tract = await fetchFfiecGeocode("1600 Pennsylvania Avenue NW, Washington, DC 20500");
+// { censusYear: 2026, state: "11", county: "001", tract: "9800.00", fips: "11001980000", … }
+```
+
+The 2026 archive is 95 MB compressed and 301 MB of headerless, 1,212-field CSV, so the download raises its own ceiling and rows are parsed one physical record at a time; each row keeps its full field list in `raw`. Match the census year to the activity year you are analyzing — a stale census file classifies tracts against the wrong income denominator. Geocoding has no documented public API: FFIEC's geomap is a single-page app, so xnews reads the manifest the app itself publishes and follows it to the ArcGIS geocoder and the FFIEC census-tract layer. That binding is not a contract and can rotate without notice.
+
+### NIC institution structure (`nic`)
+
+The National Information Center is the authoritative RSSD-ID registry — the join key every Call Report row uses. NPW publishes it as five direct ZIP downloads (no postback, no session, no key), each one comma-delimited CSV.
+
+```ts
+import { fetchNicBulkPage, fetchNicData, nicDataSource } from "@xbbg/xnews";
+
+const page = await fetchNicBulkPage(); // products plus each one's refresh stamp
+const release = await fetchNicData("attributes-active", { limit: 5000 });
+// release.asOf is NPW's stated refresh date, never the clock
+
+for await (const result of createDataReleaseWatcher(nicDataSource("relationships"))) {
+  // rows: parent RSSD -> offspring RSSD, percent held, start and end dates
+}
+```
+
+Products: `attributes-active` (4.4 MB compressed, 61,925 rows), `attributes-closed` (12.1 MB, 162,184), `attributes-branches` (14.0 MB, 173,740), `relationships` (4.8 MB, 288,498), and `transformations` (0.6 MB, 59,138). Only the page states the snapshot date — neither the archive names nor the CSVs carry one — so the data source reads the page first, which also makes `ifNewerThan` skip the download entirely when nothing has been refreshed. NPW encodes open-ended relationships as `12/31/9999`; those are normalized rather than passed through as a fake date.
+
+### FFIEC 002 foreign branches (`ffiec-002`)
+
+U.S. branches and agencies of foreign banks file the FFIEC 002. It is **not** in the CDR bulk catalog and not on FFIEC's report-forms page — the CDR's SOAP service exposes only the `Call` series — but the Federal Reserve publishes 002 micro data through NIC, one institution-quarter CSV at a time.
+
+```ts
+import { fetchFfiec002Report, ffiec002DataSource } from "@xbbg/xnews";
+
+// Deutsche Bank AG New York Branch, RSSD 112819.
+const release = await fetchFfiec002Report({ rssdId: 112819, reportingDate: "2026-06-30" });
+// release.rows: MDRM line items; RCFD2170 (total assets, $K) = 179780866
+// release.institution: name, RSSD, address, head office, country
+
+const source = ffiec002DataSource({ rssdId: 112819, reportingDate: "2026-06-30" });
+```
+
+Because it is per institution and per quarter, there is no bulk product: get the filer list from `nic` (branch entities carry their own RSSD IDs) and request the quarters you need. The response is a three-column `ItemName,Description,Value` CSV, so line items arrive with their MDRM code and label; an RSSD that does not match the request fails closed rather than returning another bank's balance sheet.
 
 ## Book catalogs (Open Library, Internet Archive, Library Genesis, Anna's Archive)
 
