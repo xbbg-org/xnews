@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/@xbbg/xnews.svg)](https://www.npmjs.com/package/@xbbg/xnews)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Pure fetch/parse/normalize utilities for building company, topic, watchlist, and research feeds, plus scheduled economic-data releases. xnews covers public market-news feeds, research-paper metadata, central-bank publications, and YouTube media; it does not persist data, schedule jobs, store state, score sentiment, or provide investment advice.
+Pure fetch/parse/normalize utilities for building company, topic, watchlist, and research feeds, plus scheduled economic-data releases and bibliographic catalog lookup. xnews covers public market-news feeds, research-paper metadata, central-bank publications, structured data releases, book and document catalogs, and YouTube media, and reads the documents it finds — EPUB, PDF, DjVu, MOBI, and CBZ text with no runtime dependency. It does not persist data, schedule jobs, store state, score sentiment, or provide investment advice.
 
 ## Install
 
@@ -20,8 +20,8 @@ Requires Node 24 or newer. The package is **ESM-only**: it exports ESM from `dis
 
 ## Subpath exports
 
-- `@xbbg/xnews/catalog` exports URL builders, `FIXED_FEEDS`, and `PROVIDER_POLICIES`. It is structurally network-free: its import graph never reaches the fetch layer.
-- `@xbbg/xnews/parsers` exports pure parsers.
+- `@xbbg/xnews/catalog` exports URL builders for every provider, `FIXED_FEEDS`, `PROVIDER_POLICIES`, and `WORKS_PROVIDER_POLICIES`. It is structurally network-free: its import graph never reaches the fetch layer.
+- `@xbbg/xnews/parsers` exports pure parsers, the shared `readZipEntries` and `parseCsvRecords`/`parseCsvTable` readers, and `parsePublishedAt`.
 - `@xbbg/xnews/asr` exports transcription APIs.
 
 ## Company feed
@@ -554,7 +554,7 @@ Every `(agency, assetClass)` pair uses the same endpoint scheme — `agency` is 
 
 ## Book catalogs (Open Library, Internet Archive, Library Genesis, Anna's Archive)
 
-A third lane. News providers answer with dated documents and data providers with dated rows; a **works** provider answers a _query_ with catalog records that carry no release date and have no natural time ordering, so the works lane has its own machinery in `src/works.ts`.
+A third lane. News providers answer with dated documents and data providers with dated rows; a **works** provider answers a _query_ with catalog records that carry no release date and have no natural time ordering, so the works lane has its own machinery: `WorksSource`, `searchWorks`, `searchWorksAcross`, and `mergeWorkRecords`.
 
 ```ts
 import { openLibrarySource, internetArchiveSource, searchWorksAcross } from "@xbbg/xnews";
@@ -578,6 +578,8 @@ const resolution = await resolveWorkIdentity(scrapedRecord, openLibrarySource())
 ```
 
 `availability` reports the catalog's access signal and defaults to `"unknown"` when the catalog states no availability metadata.
+
+`WORKS_PROVIDER_POLICIES` records what each catalog requires before you schedule it: Open Library asks for a declared User-Agent, the Internet Archive publishes no numeric rate ceiling and marks lending items borrowable rather than redistributable, and the mirror-based catalogs publish no terms or uptime contract at all.
 
 ### Mirror pools
 
@@ -643,9 +645,9 @@ Catalogs mint a token on their own host then redirect to a CDN, so downloads set
 | DjVu              | native decoder: IFF walker, the Z′-Coder arithmetic decoder, and the BZZ codec (Burrows–Wheeler with a frequency-rotated MTF)                   |
 | CBR               | **refused by name**; RAR needs a real decoder                                                                                                   |
 
-The PDF decoder does not rasterize and does not guess. Measured on real files: arXiv's _Attention Is All You Need_ is 15 pages and 35,504 characters in 82 ms; a 12.3 MB, 1,306-page copy of CLRS is 5,481,690 characters in 3.4 s. Two of three sampled files carry 30+ object streams, so `/ObjStm` support is not optional in practice.
+The PDF decoder does not rasterize and does not guess. Measured on real files: arXiv 1706.03762 (`arxiv.org/pdf/1706.03762`, _Attention Is All You Need_) is 15 pages and 35,504 characters in about 100 ms; a 12.3 MB, 1,306-page copy of CLRS is 5,481,690 characters in about 3.4 s. Two of three sampled files carry 30+ object streams, so `/ObjStm` support is not optional in practice.
 
-DjVu is implemented from the published DjVu Reference v3, not from djvulibre or djvu.js — both are GPL-2 and this package is Apache-2.0. Verified against the specification's own DjVu edition: 71 pages, 155,747 characters, 120 ms. Like a scanned PDF, a DjVu with no hidden text layer throws rather than returning nothing.
+DjVu is implemented from the published DjVu Reference v3, not from djvulibre or djvu.js — both are GPL-2 and this package is Apache-2.0. Measured against the specification's own DjVu edition (`DjVu3Spec.djvu`, 462 KB): 71 pages and 155,747 characters in under 150 ms. Like a scanned PDF, a DjVu with no hidden text layer throws rather than returning nothing.
 
 ### OCR for scans
 
