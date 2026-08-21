@@ -178,7 +178,9 @@ test("omits OONI anomalyRate when measurement_count is zero", async () => {
       requestedUrl = fetchInputUrl(input);
       return new Response(payload);
     },
-  }).fetchRelease({ since: "2026-08-06" });
-  expect(new URL(requestedUrl).searchParams.get("since")).toBe("2026-08-06");
-  expect(release?.asOf).toBe("2026-08-06");
+  }).fetchRelease({ since: "2026-08-06", until: "2026-08-20" });
+  const request = new URL(requestedUrl);
+  expect(request.searchParams.get("since")).toBe("2026-08-06");
+  expect(request.searchParams.get("until")).toBe("2026-08-20");
+  expect(release?.asOf).toBe("2026-08-20");
 });

@@ -66,6 +66,20 @@ test("GB carbon intensity combines both feeds without relabeling forecast as act
   expect(release?.rows[0]?.mix["wind"]).toBe(31.2);
 });
 
+test("GB carbon intensity rejects a generation mix from a different interval", () => {
+  const mismatched = JSON.stringify({
+    data: {
+      from: "2026-08-20T12:30Z",
+      to: "2026-08-20T13:00Z",
+      generationmix: [{ fuel: "wind", perc: 31.2 }],
+    },
+  });
+
+  expect(() => parseCarbonIntensity(intensityFixture, mismatched)).toThrow(
+    "GB carbon intensity and generation intervals do not match",
+  );
+});
+
 test("CAISO fuel mix keeps reported values and drops an all-blank trailing interval", async () => {
   const rows = parseCaisoFuelMix(caisoFixture);
   expect(rows).toHaveLength(2);

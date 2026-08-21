@@ -47,12 +47,9 @@ export function parseCarbonIntensity(
   }
   const generationFrom = stringField(generationData, "from");
   const generationTo = stringField(generationData, "to");
-  if (
-    generationFrom === undefined ||
-    generationTo === undefined ||
-    normalizeDateOnly(generationFrom) === null ||
-    normalizeDateOnly(generationTo) === null
-  ) {
+  const generationFromMs = generationFrom === undefined ? NaN : Date.parse(generationFrom);
+  const generationToMs = generationTo === undefined ? NaN : Date.parse(generationTo);
+  if (!Number.isFinite(generationFromMs) || !Number.isFinite(generationToMs)) {
     throw new Error(GB_CARBON_GENERATION_SHAPE_ERROR);
   }
   const mix = generationMix(generationData["generationmix"]);
@@ -61,13 +58,14 @@ export function parseCarbonIntensity(
   for (const record of intensityRecords) {
     const from = stringField(record, "from");
     const to = stringField(record, "to");
-    if (
-      from === undefined ||
-      to === undefined ||
-      normalizeDateOnly(from) === null ||
-      normalizeDateOnly(to) === null
-    ) {
-      continue;
+    if (from === undefined || to === undefined) continue;
+    const fromMs = Date.parse(from);
+    const toMs = Date.parse(to);
+    // The two current-state endpoints can straddle a half-hour boundary.
+    // Never attach the next interval's generation mix to this interval's
+    // intensity reading: that would publish a materially false combined row.
+    if (fromMs !== generationFromMs || toMs !== generationToMs) {
+      throw new Error("GB carbon intensity and generation intervals do not match");
     }
     const intensity = record["intensity"];
     if (!isRecord(intensity)) continue;

@@ -3,6 +3,7 @@ import { isRecord, numberField, parseJsonRecord, stringField } from "../json.js"
 import { normalizeLimit } from "../options.js";
 import type { DataSource, SourceFetchOptions } from "../types.js";
 import {
+  WIKIPEDIA_DEFAULT_PROJECT,
   WIKIPEDIA_EXCLUDED_PREFIXES,
   wikipediaPageviewsDate,
   wikipediaPageviewsUrl,
@@ -116,6 +117,7 @@ export function parseWikipediaPageviews(
     const project = stringField(itemValue, "project")?.trim();
     const articleValues = itemValue["articles"];
     if (!project || !Array.isArray(articleValues)) continue;
+    if (project !== WIKIPEDIA_DEFAULT_PROJECT) throw new Error(WIKIPEDIA_SHAPE_ERROR);
     recognizedItem = true;
 
     for (const articleValue of articleValues) {
@@ -137,7 +139,7 @@ export function parseWikipediaPageviews(
         title: article.replaceAll("_", " "),
         views,
         rank,
-        url: `https://${project}/wiki/${encodeURIComponent(article)}`,
+        url: `https://${project}.org/wiki/${encodeURIComponent(article)}`,
       });
       if (limit !== undefined && rows.length >= limit) return rows;
     }

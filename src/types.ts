@@ -482,7 +482,7 @@ export interface DataReleaseWatcherOptions extends SourceFetchOptions {
  * (see `src/events.ts`), which dedupes on event id and yields events as they
  * *appear*, the way `createTopicNewsWatcher` does for documents.
  */
-export type EventProvider =
+export type BuiltInEventProvider =
   | "nws-alerts"
   | "gdacs"
   | "nhc-storms"
@@ -493,6 +493,9 @@ export type EventProvider =
   | "faa-status"
   | "safecast-radiation"
   | "sondehub-balloons";
+
+/** Backward-compatible name for the built-in provider union. */
+export type EventProvider = BuiltInEventProvider;
 
 /**
  * What an event is about. Deliberately coarse: consumers filter on this
@@ -520,14 +523,14 @@ export type EventCategory =
 export type EventSeverity = "extreme" | "severe" | "moderate" | "minor" | "unknown";
 
 /**
- * One active event or observation. Geometry is optional: some publishers in
- * this lane (FAA airport status) state a place but no coordinates, and a
- * fabricated centroid would read as measured position.
+ * One active event or observation. Geometry is both-or-neither: some
+ * publishers (FAA airport status) state a place but no coordinates, and a
+ * fabricated or half-present point would read as measured position.
  */
-export interface EventRecord {
+interface EventRecordFields<Provider extends string> {
   /** Provider-native id where one exists, else derived; stable within `provider`. */
   readonly id: string;
-  readonly provider: EventProvider;
+  readonly provider: Provider;
   readonly category: EventCategory;
   readonly title: string;
   readonly summary?: string;
@@ -538,8 +541,8 @@ export interface EventRecord {
   /** Lifecycle window, for events that declare one (warning in force). */
   readonly startsAt?: string;
   readonly endsAt?: string;
-  readonly latitude?: number;
-  readonly longitude?: number;
+  readonly latitude?: never;
+  readonly longitude?: never;
   readonly severity: EventSeverity;
   /**
    * The publisher's own scalar, unconverted — earthquake magnitude, alert
@@ -555,16 +558,23 @@ export interface EventRecord {
   readonly eventType?: string;
 }
 
+export type EventRecord<Provider extends string = BuiltInEventProvider> =
+  | EventRecordFields<Provider>
+  | (Omit<EventRecordFields<Provider>, "latitude" | "longitude"> & {
+      readonly latitude: number;
+      readonly longitude: number;
+    });
+
 /**
  * The set of events in force at one moment. A snapshot is the whole current
  * state, not a delta: `createEventWatcher` computes deltas by id.
  */
-export interface EventSnapshot {
-  readonly provider: EventProvider;
+export interface EventSnapshot<Provider extends string = BuiltInEventProvider> {
+  readonly provider: Provider;
   readonly dataset: string;
   /** ISO instant the snapshot was taken. */
   readonly observedAt: string;
-  readonly events: readonly EventRecord[];
+  readonly events: readonly EventRecord<Provider>[];
   readonly warnings: readonly string[];
   readonly requestUrls: readonly string[];
 }
@@ -574,13 +584,13 @@ export interface EventSnapshot {
  * export factories returning sources (see `nwsAlertsSource`); consumers can
  * implement `EventSource` for their own publishers and reuse the lane.
  */
-export interface EventSource {
-  readonly provider: EventProvider;
+export interface EventSource<Provider extends string = BuiltInEventProvider> {
+  readonly provider: Provider;
   readonly dataset: string;
   /** URLs the next `fetchSnapshot` call would dial, for observability. */
   requestUrls(options?: EventFetchOptions): readonly string[];
   /** Resolves `undefined` when the publisher currently reports nothing active. */
-  fetchSnapshot(options?: EventFetchOptions): Promise<EventSnapshot | undefined>;
+  fetchSnapshot(options?: EventFetchOptions): Promise<EventSnapshot<Provider> | undefined>;
 }
 
 export interface EventFetchOptions extends SourceFetchOptions {
@@ -591,19 +601,27 @@ export interface EventFetchOptions extends SourceFetchOptions {
 }
 
 /** Uniform non-throwing outcome envelope for one snapshot fetch. */
-export interface EventProviderResult {
-  readonly provider: EventProvider;
+export interface EventProviderResult<Provider extends string = BuiltInEventProvider> {
+  readonly provider: Provider;
   readonly dataset: string;
   readonly status: ProviderStatus;
   /** Present unless the fetch failed or found nothing active. */
-  readonly snapshot?: EventSnapshot;
-  readonly events: readonly EventRecord[];
+  readonly snapshot?: EventSnapshot<Provider>;
+  /** Full current-state event set; identical to `snapshot.events` when present. */
+  readonly events: readonly EventRecord<Provider>[];
   readonly eventCount: number;
   readonly warnings: readonly string[];
   readonly fetchedAt: string;
   readonly durationMs: number;
   readonly requestUrls: readonly string[];
   readonly error?: ProviderError;
+}
+
+/** Watcher result: full snapshot plus only the ids that appeared on this poll. */
+export interface EventWatcherResult<
+  Provider extends string = BuiltInEventProvider,
+> extends EventProviderResult<Provider> {
+  readonly addedEvents: readonly EventRecord<Provider>[];
 }
 
 export interface EventWatcherOptions extends EventFetchOptions {

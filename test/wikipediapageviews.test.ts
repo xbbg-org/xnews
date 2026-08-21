@@ -65,10 +65,21 @@ test("parseWikipediaPageviews filters namespaces before applying limit", () => {
     title: "2026 United States elections",
     views: 900_000,
     rank: 4,
-    url: "https://en.wikipedia/wiki/2026_United_States_elections",
+    url: "https://en.wikipedia.org/wiki/2026_United_States_elections",
   });
   expect(rows[1]?.title).toBe("Café & culture");
-  expect(rows[1]?.url).toBe("https://en.wikipedia/wiki/Caf%C3%A9_%26_culture");
+  expect(rows[1]?.url).toBe("https://en.wikipedia.org/wiki/Caf%C3%A9_%26_culture");
+});
+
+test("pageview rows use the canonical Wikimedia origin and reject unsupported projects", () => {
+  expect(parseWikipediaPageviews(fixture)[0]?.url).toStartWith("https://en.wikipedia.org/wiki/");
+  expect(() =>
+    parseWikipediaPageviews(
+      JSON.stringify({
+        items: [{ project: "fr.wikipedia", articles: [{ article: "Accueil", views: 1, rank: 1 }] }],
+      }),
+    ),
+  ).toThrow("unexpected Wikimedia pageviews response shape");
 });
 
 test("parseWikipediaPageviews can include non-article pages", () => {

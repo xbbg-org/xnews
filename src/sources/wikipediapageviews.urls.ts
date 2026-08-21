@@ -3,7 +3,12 @@ import { normalizeDateOnly } from "../dates.js";
 export type WikipediaPageviewsAccess = "all-access" | "desktop" | "mobile-app" | "mobile-web";
 
 export interface WikipediaPageviewsUrlOptions {
-  readonly project?: string;
+  /**
+   * Restricted to English Wikipedia because the default namespace filter is
+   * English-specific; claiming arbitrary-project filtering would let localized
+   * navigation namespaces consume the result limit.
+   */
+  readonly project?: "en.wikipedia";
   readonly access?: WikipediaPageviewsAccess;
   readonly date?: string | Date;
 }
@@ -64,8 +69,11 @@ export function wikipediaPageviewsDate(date?: string | Date): string {
 }
 
 export function wikipediaPageviewsUrl(options: WikipediaPageviewsUrlOptions = {}): string {
-  const project = encodeURIComponent(options.project ?? WIKIPEDIA_DEFAULT_PROJECT);
+  const project = options.project ?? WIKIPEDIA_DEFAULT_PROJECT;
+  if (project !== WIKIPEDIA_DEFAULT_PROJECT) {
+    throw new RangeError("project must be en.wikipedia; namespace filtering is English-specific");
+  }
   const access = encodeURIComponent(options.access ?? WIKIPEDIA_DEFAULT_ACCESS);
   const [year, month, day] = wikipediaPageviewsDate(options.date).split("-");
-  return `${WIKIPEDIA_PAGEVIEWS_API_BASE_URL}/${project}/${access}/${year}/${month}/${day}`;
+  return `${WIKIPEDIA_PAGEVIEWS_API_BASE_URL}/${encodeURIComponent(project)}/${access}/${year}/${month}/${day}`;
 }

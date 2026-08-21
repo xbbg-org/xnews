@@ -10,10 +10,10 @@ import {
 import type {
   EventFetchOptions,
   EventProvider,
-  EventProviderResult,
   EventRecord,
   EventSnapshot,
   EventSource,
+  EventWatcherResult,
 } from "../src/types.js";
 
 function event(overrides: Partial<EventRecord> & Pick<EventRecord, "id">): EventRecord {
@@ -63,10 +63,10 @@ function stubSource(
 }
 
 async function takeResults(
-  generator: AsyncGenerator<EventProviderResult>,
+  generator: AsyncGenerator<EventWatcherResult>,
   count: number,
-): Promise<EventProviderResult[]> {
-  const results: EventProviderResult[] = [];
+): Promise<EventWatcherResult[]> {
+  const results: EventWatcherResult[] = [];
   for await (const result of generator) {
     results.push(result);
     if (results.length >= count) break;
@@ -126,6 +126,14 @@ test("fetchEventSnapshot reports empty, partial, and ok distinctly", async () =>
   expect(partial.status).toBe("partial");
   expect(partial.warnings).toEqual(["one region failed"]);
 });
+test("sortEvents compares ISO offsets chronologically, not lexicographically", () => {
+  const sorted = sortEvents([
+    event({ id: "later", observedAt: "2026-08-20T10:00:00-05:00" }),
+    event({ id: "earlier", observedAt: "2026-08-20T14:30:00Z" }),
+    event({ id: "undated" }),
+  ]);
+  expect(sorted.map((entry) => entry.id)).toEqual(["later", "earlier", "undated"]);
+});
 
 test("fetchEventSnapshot converts a transport failure into an error envelope", async () => {
   const result = await fetchEventSnapshot(stubSource([new Error("upstream exploded")]));
@@ -161,6 +169,46 @@ test("fetchEventSnapshot rejects a snapshot whose provider disagrees with its so
   expect(result.error?.message).toContain("inconsistent provider");
 });
 
+test("snapshot validation rejects record-provider and coordinate mismatches", async () => {
+  const wrongProvider = await fetchEventSnapshot(
+    stubSource([[event({ id: "wrong", provider: "gdacs" })]]),
+  );
+  expect(wrongProvider.status).toBe("error");
+  expect(wrongProvider.error?.message).toContain("inconsistent provider");
+
+  const invalidPoint = await fetchEventSnapshot(
+    stubSource([[event({ id: "bad-point", latitude: 91, longitude: 0 })]]),
+  );
+  expect(invalidPoint.status).toBe("error");
+  expect(invalidPoint.error?.message).toContain("invalid coordinates");
+});
+
+test("custom publishers can bind one provider literal through the lane", async () => {
+  const source: EventSource<"custom-weather"> = {
+    provider: "custom-weather",
+    dataset: "alerts",
+    requestUrls: () => [],
+    fetchSnapshot: async () => ({
+      provider: "custom-weather",
+      dataset: "alerts",
+      observedAt: "2026-08-20T00:00:00.000Z",
+      events: [
+        {
+          id: "custom-1",
+          provider: "custom-weather",
+          category: "weather",
+          title: "Custom alert",
+          severity: "minor",
+        },
+      ],
+      warnings: [],
+      requestUrls: [],
+    }),
+  };
+  const result = await fetchEventSnapshot(source);
+  expect(result.provider).toBe("custom-weather");
+  expect(result.events[0]?.provider).toBe("custom-weather");
+});
 test("source-level filtering is applied before the status is decided", async () => {
   const result = await fetchEventSnapshot(stubSource([[event({ id: "a", severity: "minor" })]]), {
     minSeverity: "extreme",
@@ -177,12 +225,14 @@ test("the watcher yields each event once, not the whole snapshot every poll", as
     [event({ id: "a" }), event({ id: "b" }), event({ id: "c" })],
   ]);
   const results = await takeResults(createEventWatcher(source, { intervalMs: 0 }), 3);
-  // A warning in force across polls must not re-fire; only new ids appear.
-  expect(results.map((result) => result.events.map((entry) => entry.id))).toEqual([
+  // Full snapshots remain full; only `addedEvents` is the watcher delta.
+  expect(results.map((result) => result.addedEvents.map((entry) => entry.id))).toEqual([
     ["a"],
     ["b"],
     ["c"],
   ]);
+  expect(results[2]?.snapshot?.events.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
+  expect(results[2]?.events.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
 });
 
 test("the watcher does not replay ids supplied as already seen", async () => {
@@ -191,11 +241,12 @@ test("the watcher does not replay ids supplied as already seen", async () => {
     createEventWatcher(source, { intervalMs: 0, seenIds: ["a"] }),
     1,
   );
-  expect(results[0]?.events.map((entry) => entry.id)).toEqual(["b"]);
+  expect(results[0]?.addedEvents.map((entry) => entry.id)).toEqual(["b"]);
+  expect(results[0]?.events.map((entry) => entry.id)).toEqual(["a", "b"]);
 });
 
 test("the watcher rejects a nonsensical id budget", async () => {
-  const results: EventProviderResult[] = [];
+  const results: EventWatcherResult[] = [];
   for await (const result of createEventWatcher(stubSource([[event({ id: "a" })]]), {
     intervalMs: 0,
     maxSeenIds: 0,
@@ -205,6 +256,20 @@ test("the watcher rejects a nonsensical id budget", async () => {
   expect(results).toHaveLength(1);
   expect(results[0]?.status).toBe("disabled");
   expect(results[0]?.error?.code).toBe("config");
+});
+
+test("the watcher rejects invalid poll intervals before dialing", async () => {
+  for (const intervalMs of [-1, Number.POSITIVE_INFINITY, 2_147_483_648]) {
+    const results: EventWatcherResult[] = [];
+    for await (const result of createEventWatcher(stubSource([[event({ id: "a" })]]), {
+      intervalMs,
+    })) {
+      results.push(result);
+    }
+    expect(results).toHaveLength(1);
+    expect(results[0]?.status).toBe("disabled");
+    expect(results[0]?.error?.code).toBe("config");
+  }
 });
 
 test("the watcher reports a repeated failure once, then recovers", async () => {
@@ -219,7 +284,7 @@ test("the watcher reports a repeated failure once, then recovers", async () => {
   const results = await takeResults(createEventWatcher(source, { intervalMs: 0 }), 2);
 
   expect(results.map((result) => result.status)).toEqual(["error", "ok"]);
-  expect(results[1]?.events.map((entry) => entry.id)).toEqual(["a"]);
+  expect(results[1]?.addedEvents.map((entry) => entry.id)).toEqual(["a"]);
 });
 
 test("the watcher re-reports a failure when the reason changes", async () => {

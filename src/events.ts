@@ -29,11 +29,13 @@ import type {
   EventSnapshot,
   EventSource,
   EventWatcherOptions,
+  EventWatcherResult,
   ProviderError,
 } from "./types.js";
 
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_MAX_SEEN_IDS = 10_000;
+const MAX_TIMER_MS = 2_147_483_647;
 
 /**
  * Ascending urgency. `unknown` sorts at the bottom so a `minSeverity` filter
@@ -56,10 +58,10 @@ const SEVERITY_RANK: Readonly<Record<EventSeverity, number>> = {
  * configuration preconditions land in `status: "disabled"`, and a snapshot
  * that parsed with warnings but still yielded events is `"partial"`.
  */
-export async function fetchEventSnapshot(
-  source: EventSource,
+export async function fetchEventSnapshot<Provider extends string>(
+  source: EventSource<Provider>,
   options: EventFetchOptions = {},
-): Promise<EventProviderResult> {
+): Promise<EventProviderResult<Provider>> {
   const startedAt = Date.now();
   let requestUrls: readonly string[] = [];
   try {
@@ -95,49 +97,64 @@ export async function fetchEventSnapshot(
  * instead of failing it. Events are returned most urgent first, then most
  * recently observed.
  */
-export async function fetchEventsAcross(
-  sources: readonly EventSource[],
+export async function fetchEventsAcross<Provider extends string>(
+  sources: readonly EventSource<Provider>[],
   options: EventFetchOptions = {},
 ): Promise<{
-  readonly events: readonly EventRecord[];
-  readonly results: readonly EventProviderResult[];
+  readonly events: readonly EventRecord<Provider>[];
+  readonly results: readonly EventProviderResult<Provider>[];
 }> {
   const results = await Promise.all(sources.map((source) => fetchEventSnapshot(source, options)));
   return { events: sortEvents(results.flatMap((result) => result.events)), results };
 }
-
 /**
- * Polls a publisher and yields each event the first time it is seen.
+ * Polls a publisher and yields whenever an event first appears.
  *
- * Unlike the data lane's watcher this never re-yields a whole payload: a
- * snapshot is the current state, so re-emitting it every poll would report
- * a week-long hurricane warning as new every five minutes. Instead ids are
- * remembered and only unseen events are yielded, bounded by `maxSeenIds`
- * with oldest-first eviction so a high-churn publisher cannot grow memory
- * without limit.
+ * Every watcher result retains the full current state in `snapshot`/`events`
+ * and exposes only newly seen ids in `addedEvents`. This avoids both failure
+ * modes: replaying a week-long warning as new every five minutes, and making a
+ * consumer that replaces state from `snapshot.events` delete still-active
+ * warnings.
  *
+ * Remembered ids are bounded by `maxSeenIds` with oldest-first eviction.
  * Failed polls are yielded once per distinct failure — consecutive identical
  * failures are suppressed until a poll succeeds — matching the data lane.
- * Polls that surface no unseen events yield nothing. Like the other lanes'
- * watchers, the generator runs until `signal` aborts.
+ * Polls with no unseen events yield nothing. The generator runs until `signal`
+ * aborts.
  */
-export async function* createEventWatcher(
-  source: EventSource,
+export async function* createEventWatcher<Provider extends string>(
+  source: EventSource<Provider>,
   options: EventWatcherOptions = {},
-): AsyncGenerator<EventProviderResult> {
+): AsyncGenerator<EventWatcherResult<Provider>> {
   const maxSeenIds = options.maxSeenIds ?? DEFAULT_MAX_SEEN_IDS;
   if (!Number.isSafeInteger(maxSeenIds) || maxSeenIds < 1) {
-    yield eventProviderResult(source, {
-      status: "disabled",
-      warnings: [`${source.provider}: maxSeenIds must be a positive safe integer`],
-      startedAt: Date.now(),
-      requestUrls: [],
-      error: { code: "config", message: "maxSeenIds must be a positive safe integer" },
-    });
+    yield withAddedEvents(
+      eventProviderResult(source, {
+        status: "disabled",
+        warnings: [`${source.provider}: maxSeenIds must be a positive safe integer`],
+        startedAt: Date.now(),
+        requestUrls: [],
+        error: { code: "config", message: "maxSeenIds must be a positive safe integer" },
+      }),
+      [],
+    );
     return;
   }
 
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
+  if (!Number.isFinite(intervalMs) || intervalMs < 0 || intervalMs > MAX_TIMER_MS) {
+    yield withAddedEvents(
+      eventProviderResult(source, {
+        status: "disabled",
+        warnings: [`${source.provider}: intervalMs must be between 0 and ${MAX_TIMER_MS}`],
+        startedAt: Date.now(),
+        requestUrls: [],
+        error: { code: "config", message: `intervalMs must be between 0 and ${MAX_TIMER_MS}` },
+      }),
+      [],
+    );
+    return;
+  }
   // Insertion-ordered, so eviction is oldest-first.
   const seen = new Set<string>(options.seenIds ?? []);
   evictOldest(seen, maxSeenIds);
@@ -149,7 +166,7 @@ export async function* createEventWatcher(
       const failureKey = failureKeyOf(result.status, result.error);
       if (failureKey !== lastFailureKey) {
         lastFailureKey = failureKey;
-        yield result;
+        yield withAddedEvents(result, []);
       }
     } else {
       lastFailureKey = undefined;
@@ -157,7 +174,7 @@ export async function* createEventWatcher(
       if (fresh.length > 0) {
         for (const event of fresh) seen.add(event.id);
         evictOldest(seen, maxSeenIds);
-        yield withEvents(result, fresh);
+        yield withAddedEvents(result, fresh);
       }
     }
     if (options.signal?.aborted) break;
@@ -165,13 +182,19 @@ export async function* createEventWatcher(
   }
 }
 
-/** Most urgent first, then most recently observed, then by id for stability. */
-export function sortEvents(events: readonly EventRecord[]): readonly EventRecord[] {
+/** Most urgent first, then chronologically most recent, then by id for stability. */
+export function sortEvents<Provider extends string>(
+  events: readonly EventRecord<Provider>[],
+): readonly EventRecord<Provider>[] {
   return events.toSorted((left, right) => {
     const bySeverity = SEVERITY_RANK[right.severity] - SEVERITY_RANK[left.severity];
     if (bySeverity !== 0) return bySeverity;
-    const byObserved = (right.observedAt ?? "").localeCompare(left.observedAt ?? "");
-    if (byObserved !== 0) return byObserved;
+    const leftMs = left.observedAt === undefined ? NaN : Date.parse(left.observedAt);
+    const rightMs = right.observedAt === undefined ? NaN : Date.parse(right.observedAt);
+    const leftValid = Number.isFinite(leftMs);
+    const rightValid = Number.isFinite(rightMs);
+    if (leftValid !== rightValid) return rightValid ? 1 : -1;
+    if (leftValid && rightValid && leftMs !== rightMs) return rightMs - leftMs;
     return left.id.localeCompare(right.id);
   });
 }
@@ -186,10 +209,10 @@ export function meetsSeverity(severity: EventSeverity, floor: EventSeverity): bo
  * call this so every publisher honors both options identically, including
  * publishers whose upstream API cannot filter server-side.
  */
-export function filterEvents(
-  events: readonly EventRecord[],
+export function filterEvents<Provider extends string>(
+  events: readonly EventRecord<Provider>[],
   options: EventFetchOptions = {},
-): readonly EventRecord[] {
+): readonly EventRecord<Provider>[] {
   const floor = options.minSeverity;
   const countries =
     options.countryCodes === undefined
@@ -207,12 +230,15 @@ export function filterEvents(
   });
 }
 
-function filterSnapshot(snapshot: EventSnapshot, options: EventFetchOptions): EventSnapshot {
+function filterSnapshot<Provider extends string>(
+  snapshot: EventSnapshot<Provider>,
+  options: EventFetchOptions,
+): EventSnapshot<Provider> {
   const events = filterEvents(snapshot.events, options);
   return events.length === snapshot.events.length ? snapshot : { ...snapshot, events };
 }
 
-function statusOf(snapshot: EventSnapshot | undefined): EventProviderResult["status"] {
+function statusOf(snapshot: EventSnapshot<string> | undefined): EventProviderResult["status"] {
   if (snapshot === undefined || snapshot.events.length === 0) return "empty";
   return snapshot.warnings.length > 0 ? "partial" : "ok";
 }
@@ -227,24 +253,21 @@ function evictOldest(seen: Set<string>, maxSeenIds: number): void {
   }
 }
 
-function withEvents(
-  result: EventProviderResult,
-  events: readonly EventRecord[],
-): EventProviderResult {
-  const sorted = sortEvents(events);
-  return {
-    ...result,
-    ...(result.snapshot ? { snapshot: { ...result.snapshot, events: sorted } } : {}),
-    events: sorted,
-    eventCount: sorted.length,
-  };
+function withAddedEvents<Provider extends string>(
+  result: EventProviderResult<Provider>,
+  addedEvents: readonly EventRecord<Provider>[],
+): EventWatcherResult<Provider> {
+  return { ...result, addedEvents: sortEvents(addedEvents) };
 }
 
 function failureKeyOf(status: string, error: ProviderError | undefined): string {
   return `${status}:${error?.code ?? ""}:${error?.status ?? ""}:${error?.message ?? ""}`;
 }
 
-function validateSnapshot(source: EventSource, snapshot: EventSnapshot): void {
+function validateSnapshot<Provider extends string>(
+  source: EventSource<Provider>,
+  snapshot: EventSnapshot<Provider>,
+): void {
   if (snapshot.provider !== source.provider) {
     throw new RangeError("EventSource returned a snapshot with an inconsistent provider");
   }
@@ -256,28 +279,45 @@ function validateSnapshot(source: EventSource, snapshot: EventSnapshot): void {
   }
   const ids = new Set<string>();
   for (const event of snapshot.events) {
-    if (event.id === "") {
-      throw new RangeError("EventSource returned an event with an empty id");
+    if (event.provider !== snapshot.provider) {
+      throw new RangeError("EventSource returned an event with an inconsistent provider");
     }
-    // Duplicate ids would make the watcher's delta silently lossy.
-    if (ids.has(event.id)) {
+    if (event.id === "") throw new RangeError("EventSource returned an event with an empty id");
+    if (ids.has(event.id))
       throw new RangeError(`EventSource returned duplicate event id ${event.id}`);
-    }
     ids.add(event.id);
+
+    const hasLatitude = event.latitude !== undefined;
+    const hasLongitude = event.longitude !== undefined;
+    if (hasLatitude !== hasLongitude) {
+      throw new RangeError("EventSource returned an event with incomplete coordinates");
+    }
+    if (
+      hasLatitude &&
+      hasLongitude &&
+      (!Number.isFinite(event.latitude) ||
+        event.latitude < -90 ||
+        event.latitude > 90 ||
+        !Number.isFinite(event.longitude) ||
+        event.longitude < -180 ||
+        event.longitude > 180)
+    ) {
+      throw new RangeError("EventSource returned an event with invalid coordinates");
+    }
   }
 }
 
-function eventProviderResult(
-  source: EventSource,
+function eventProviderResult<Provider extends string>(
+  source: EventSource<Provider>,
   options: {
-    readonly status: EventProviderResult["status"];
-    readonly snapshot?: EventSnapshot;
+    readonly status: EventProviderResult<Provider>["status"];
+    readonly snapshot?: EventSnapshot<Provider>;
     readonly warnings?: readonly string[];
     readonly startedAt: number;
     readonly requestUrls: readonly string[];
     readonly error?: ProviderError;
   },
-): EventProviderResult {
+): EventProviderResult<Provider> {
   const events = options.snapshot ? sortEvents(options.snapshot.events) : [];
   return {
     provider: source.provider,

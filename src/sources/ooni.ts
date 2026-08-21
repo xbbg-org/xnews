@@ -108,10 +108,10 @@ export function ooniDataSource(options: DataFetchOptions = {}): DataSource<OoniC
 }
 
 function resolveOoniRequest(options: DataFetchOptions, nowMs = Date.now()): OoniRequest {
-  // `since` is optional here, and exactOptionalPropertyTypes forbids passing
-  // an explicit `undefined` through to the window normalizer.
-  const window = normalizeDateWindow(options.since === undefined ? {} : { since: options.since });
+  const window = normalizeDateWindow(options);
   const sinceMs = window.sinceMs ?? nowMs - OONI_DEFAULT_LOOKBACK_DAYS * ONE_DAY_MS;
-  const asOf = new Date(sinceMs).toISOString().slice(0, 10);
-  return { url: ooniAggregationUrl(asOf), asOf };
+  const untilMs = window.untilMs ?? nowMs;
+  const since = new Date(sinceMs).toISOString().slice(0, 10);
+  const asOf = new Date(untilMs).toISOString().slice(0, 10);
+  return { url: ooniAggregationUrl(since, asOf), asOf };
 }

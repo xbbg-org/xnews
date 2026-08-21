@@ -513,8 +513,9 @@ const foodSecurity = await fetchDataRelease(
 
 `DataRelease.asOf` cannot model a warning set that changes continuously: a daily key would emit at
 most once per day, while a poll timestamp would replay the whole set every poll. `EventSource`
-therefore returns an `EventSnapshot`; `createEventWatcher` remembers stable event ids and yields
-only newly appeared records. The id set is bounded with oldest-first eviction.
+therefore returns an `EventSnapshot`; `createEventWatcher` remembers stable event ids and yields only
+when something appears. Each `EventWatcherResult` keeps the full state in `snapshot`/`events` and
+puts the poll delta in `addedEvents`. The id set is bounded with oldest-first eviction.
 
 ```ts
 import {
@@ -533,7 +534,7 @@ for await (const result of createEventWatcher(nwsAlertsSource(), {
   minSeverity: "severe",
   intervalMs: 5 * 60_000,
 })) {
-  for (const event of result.events) console.log(event.title);
+  for (const event of result.addedEvents) console.log(event.title);
 }
 ```
 
