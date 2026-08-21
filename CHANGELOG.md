@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Drought Monitor, NASA GISTEMP, GB carbon intensity/generation, CAISO fuel
   mix, CISA KEV, IODA outages, OONI censorship anomalies, Wikipedia daily
   attention, the 13,269-row historical US Congress edits archive (House/Senate
-  attribution from the archive's own ranges), CDC wastewater, UNHCR
+  attribution from the archive's own ranges), and a public RecentChanges
+  adapter that keeps direct congressional-IP attribution separate from
+  unattributed Congress-topic relevance, plus CDC wastewater, UNHCR
   displacement, WFP HungerMap, and WHO
   outbreak notices. WFP has withdrawn anonymous HungerMap access, so its source
   requires a caller-supplied `apiKey` and is `disabled` without one.

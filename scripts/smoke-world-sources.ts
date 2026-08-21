@@ -52,6 +52,7 @@ import {
   usgsVolcanoesSource,
   wikipediaPageviewsDataSource,
   wikipediaCongressEditsDataSource,
+  wikipediaCongressRecentChangesSource,
   worldBankIndicatorDataSource,
   YAHOO_FUTURES_SYMBOLS,
 } from "../src/index.js";
@@ -70,6 +71,7 @@ const MAY_BE_EMPTY: Record<string, true> = {
   "faa-status": true,
   gdacs: true,
   "glofas-flood": true,
+  "wikipedia-congress-recent": true,
 };
 
 async function check(label: string, run: () => Promise<Outcome>): Promise<void> {
@@ -197,6 +199,10 @@ await checkRelease("wikipedia-pageviews", wikipediaPageviewsDataSource({ limit: 
 await checkRelease(
   "wikipedia-congress",
   wikipediaCongressEditsDataSource({ chambers: ["house", "senate"], limit: 10 }),
+);
+await checkSnapshot(
+  "wikipedia-congress-recent",
+  wikipediaCongressRecentChangesSource({ limit: 10 }),
 );
 
 console.log("\n— health & humanitarian —");

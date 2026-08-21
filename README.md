@@ -478,16 +478,16 @@ the obsolete integer-cent conversion.
 
 ### New structured-data sources
 
-| Domain               | Provider / factory                                                                            | Published data                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Federal money        | `usaSpendingDataSource`, `grantsGovDataSource`                                                | Contract awards; open grant opportunities                                              |
-| Macro                | `worldBankIndicatorDataSource`                                                                | World Bank CPI inflation, unemployment, GDP growth, poverty, or any raw indicator code |
-| Climate              | `noaaOniDataSource`, `droughtMonitorDataSource`, `noaaCo2DataSource`, `nasaGistempDataSource` | ENSO/ONI, US drought coverage, atmospheric CO₂, global temperature anomaly             |
-| Power                | `carbonIntensityDataSource`, `caisoFuelMixDataSource`                                         | GB carbon intensity/generation mix; CAISO five-minute fuel mix                         |
-| Cyber/infrastructure | `cisaKevDataSource`, `iodaDataSource`, `ooniDataSource`                                       | Known-exploited vulnerabilities, country internet outages, censorship anomalies        |
-| Attention/audit      | `wikipediaPageviewsDataSource`, `wikipediaCongressEditsDataSource`                            | Daily top articles; 13,269 historical edits from US congressional networks             |
-| Public health        | `cdcWastewaterDataSource`                                                                     | CDC wastewater activity                                                                |
-| Humanitarian         | `unhcrDataSource`, `hungerMapDataSource`                                                      | Forced displacement; WFP food-security estimates                                       |
+| Domain               | Provider / factory                                                                                         | Published data                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Federal money        | `usaSpendingDataSource`, `grantsGovDataSource`                                                             | Contract awards; open grant opportunities                                                |
+| Macro                | `worldBankIndicatorDataSource`                                                                             | World Bank CPI inflation, unemployment, GDP growth, poverty, or any raw indicator code   |
+| Climate              | `noaaOniDataSource`, `droughtMonitorDataSource`, `noaaCo2DataSource`, `nasaGistempDataSource`              | ENSO/ONI, US drought coverage, atmospheric CO₂, global temperature anomaly               |
+| Power                | `carbonIntensityDataSource`, `caisoFuelMixDataSource`                                                      | GB carbon intensity/generation mix; CAISO five-minute fuel mix                           |
+| Cyber/infrastructure | `cisaKevDataSource`, `iodaDataSource`, `ooniDataSource`                                                    | Known-exploited vulnerabilities, country internet outages, censorship anomalies          |
+| Attention/audit      | `wikipediaPageviewsDataSource`, `wikipediaCongressEditsDataSource`, `wikipediaCongressRecentChangesSource` | Daily top articles; historical Congress edits; current public direct-IP/relevance alerts |
+| Public health        | `cdcWastewaterDataSource`                                                                                  | CDC wastewater activity                                                                  |
+| Humanitarian         | `unhcrDataSource`, `hungerMapDataSource`                                                                   | Forced displacement; WFP food-security estimates                                         |
 
 World Bank `country/all` results mark aggregates explicitly with `isAggregate`; they are not mixed
 silently into sovereign-country analysis. Wikimedia pageviews default to the most recent published
@@ -495,10 +495,21 @@ day because yesterday's ranking is commonly unavailable for the first hours of a
 `wikipediaCongressEditsDataSource` reads the `anon-history` archive generated from Wikimedia dumps,
 classifies each edit with the archive's complete House/Senate range manifest, and exposes chamber,
 date, and limit filters. Its coverage is explicitly historical: 13,269 English-Wikipedia edits from
-`2003-11-10` through `2014-07-07`. It is **not** a current detector—Wikimedia temporary accounts
-removed public IP attribution for logged-out edits by late 2025. The CDC and CFTC adapters share a
-generic network-free `socrataResourceUrl` builder; COT-specific columns and filters remain layered
-above it.
+`2003-11-10` through `2014-07-07`.
+
+`fetchWikipediaCongressRecentChanges` and `wikipediaCongressRecentChangesSource` read the official
+public RecentChanges API for new edits. The returned row keeps two claims separate:
+`attribution.kind === "congress-network"` requires a publicly stated editor IP matching the
+House/Senate manifest; `relevanceSignals` only says the page title or edit comment is Congress
+related. Temporary-account and registered edits may be relevant but remain `unattributed`.
+`createEventWatcher(wikipediaCongressRecentChangesSource())` generates alerts for newly seen
+revision ids.
+
+This source does not call privileged CheckUser/IPInfo APIs. Wikimedia temporary accounts removed
+public IP attribution for most logged-out edits by late 2025, and Wikimedia restricts IP reveal to
+logged anti-abuse use. Content/timing analysis therefore never becomes an origin claim. The CDC and
+CFTC adapters share a generic network-free `socrataResourceUrl` builder; COT-specific columns and
+filters remain layered above it.
 
 WFP withdrew anonymous HungerMap access: `hungerMapDataSource()` without an `apiKey` returns lane
 status `disabled` before network I/O. Supply a WFP-issued token to use the live endpoint:

@@ -647,6 +647,14 @@ export {
   WIKIPEDIA_CONGRESS_EDITS_PAGE_URL,
   WIKIPEDIA_CONGRESS_EDITS_RANGES_URL,
 } from "./sources/wikipediacongressedits.urls.js";
+export {
+  WIKIPEDIA_CONGRESS_RECENT_DEFAULT_WINDOW_MS,
+  WIKIPEDIA_RECENT_CHANGES_API_URL,
+  WIKIPEDIA_RECENT_CHANGES_MAX_LIMIT,
+  wikipediaCongressRecentChangesUrl,
+  wikipediaRevisionDiffUrl,
+} from "./sources/wikipediacongressrecent.urls.js";
+export type { WikipediaCongressRecentChangesUrlOptions } from "./sources/wikipediacongressrecent.urls.js";
 
 export {
   isWorldBankIndicatorAlias,

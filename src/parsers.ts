@@ -196,14 +196,27 @@ export type {
   WikipediaPageviewsParseOptions,
 } from "./sources/wikipediapageviews.js";
 export {
+  matchCongressionalIp,
   parseCongressionalIpRanges,
   parseWikipediaCongressEdits,
 } from "./sources/wikipediacongressedits.js";
 export type {
   CongressChamber,
+  CongressionalIpMatch,
   CongressionalIpRange,
   WikipediaCongressEditRow,
 } from "./sources/wikipediacongressedits.js";
+export {
+  parseWikipediaCongressRecentChanges,
+  parseWikipediaCongressRecentChangesPage,
+} from "./sources/wikipediacongressrecent.js";
+export type {
+  WikipediaCongressAttribution,
+  WikipediaCongressEditorKind,
+  WikipediaCongressRecentChangeRow,
+  WikipediaCongressRecentChangesPage,
+  WikipediaCongressRelevanceSignal,
+} from "./sources/wikipediacongressrecent.js";
 
 export { parseWorldBankIndicator } from "./sources/worldbankindicators.js";
 export type { WorldBankIndicatorRow } from "./sources/worldbankindicators.js";

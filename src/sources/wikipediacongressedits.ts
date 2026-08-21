@@ -85,6 +85,22 @@ export function parseCongressionalIpRanges(body: string): CongressionalIpRange[]
   return ranges;
 }
 
+export interface CongressionalIpMatch {
+  readonly address: string;
+  readonly integer: number;
+  readonly range: CongressionalIpRange;
+}
+
+/** Matches one public IPv4 editor identity against the archive's range manifest. */
+export function matchCongressionalIp(
+  address: string,
+  ranges: readonly CongressionalIpRange[],
+): CongressionalIpMatch | undefined {
+  const integer = ipv4ToInteger(address);
+  if (integer === undefined) return undefined;
+  const range = ranges.find((candidate) => integer >= candidate.start && integer <= candidate.end);
+  return range === undefined ? undefined : { address, integer, range };
+}
 /**
  * Parses the historical archive. Rows are newest-first in the published CSV;
  * filters preserve that order and `limit` is applied after chamber/date
@@ -128,14 +144,11 @@ export function parseWikipediaCongressEdits(
     }
     recognizableRows += 1;
 
-    const contributorIpInt = ipv4ToInteger(contributorIp);
-    if (contributorIpInt === undefined || contributorIpInt !== publishedIpInt) {
+    const ipMatch = matchCongressionalIp(contributorIp, ranges);
+    if (ipMatch === undefined || ipMatch.integer !== publishedIpInt) {
       throw new Error(CONGRESS_EDITS_SHAPE_ERROR);
     }
-    const range = ranges.find(
-      (candidate) => contributorIpInt >= candidate.start && contributorIpInt <= candidate.end,
-    );
-    if (range === undefined) continue;
+    const { range, integer: contributorIpInt } = ipMatch;
     if (chambers !== undefined && !chambers.has(range.chamber)) continue;
 
     const timestampMs = timestampSeconds * 1_000;

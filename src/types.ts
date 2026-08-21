@@ -492,7 +492,8 @@ export type BuiltInEventProvider =
   | "gdelt-events"
   | "faa-status"
   | "safecast-radiation"
-  | "sondehub-balloons";
+  | "sondehub-balloons"
+  | "wikipedia-congress-edits";
 
 /** Backward-compatible name for the built-in provider union. */
 export type EventProvider = BuiltInEventProvider;
