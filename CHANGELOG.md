@@ -25,6 +25,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm-publish.yml` now cuts the GitHub release from the matching `CHANGELOG.md` section, so the tag, the npm tarball, and the GitHub release notes cannot drift apart.
 - Added federal bank-regulator announcement feeds as fixed providers: FFIEC (`ffiec`), FDIC press releases and board notices (`fdic`), OCC news releases and bulletins (`occ`), and the CFPB newsroom (`cfpb`). Like other fixed feeds they are fetched whole, filtered locally against the subject, and marked as press releases.
 - Added a structured-data lane beside the news lane: `DataSource` binds a scheduled data publisher's dataset to its transport, `fetchDataRelease` wraps any source in the news lane's non-throwing status taxonomy, and `createDataReleaseWatcher` polls until a release with a new `asOf` appears, deduplicating consecutive identical failures. New `NewsItem.kind: "data"` marks items bridged from data releases.
+- Added an active-events lane for continuously changing alert sets: `EventSource`,
+  `fetchEventSnapshot`, `fetchEventsAcross`, and the id-deduplicating
+  `createEventWatcher`. Built-in event sources cover NWS alerts, NHC storms,
+  GDACS disasters, USGS volcanoes, NOAA tsunami messages, GloFAS basin
+  outlooks, raw GDELT v2 events, FAA airport status, Safecast measurements, and
+  SondeHub radiosondes.
+- Added live markets and federal-money adapters: keyless Yahoo quotes/OHLCV and
+  common futures symbols; normalized Kalshi, Polymarket, and Manifold YES
+  probabilities; USAspending contract awards; Grants.gov opportunities; and
+  locally filtered OFAC sanctions actions.
+- Added macro, climate, energy, cyber, attention, public-health, and
+  humanitarian data sources: World Bank indicators, NOAA ONI and CO₂, US
+  Drought Monitor, NASA GISTEMP, GB carbon intensity/generation, CAISO fuel
+  mix, CISA KEV, IODA outages, OONI censorship anomalies, Wikipedia daily
+  attention, the 13,269-row historical US Congress edits archive (House/Senate
+  attribution from the archive's own ranges), CDC wastewater, UNHCR
+  displacement, WFP HungerMap, and WHO
+  outbreak notices. WFP has withdrawn anonymous HungerMap access, so its source
+  requires a caller-supplied `apiKey` and is `disabled` without one.
+- Added geospatial current-state APIs for NYC, London TfL, Delaware, and New
+  Zealand traffic cameras plus DeepStateMap territory polygons, and a
+  `smoke:world` live gate covering the complete added source surface.
 - Added CFTC Commitments of Traders as the first data provider (`fetchCotReport`, `cotDataSource`, `parseCotRows`, `cotReleaseToNewsItems`) over CFTC's free, keyless Socrata API: all seven datasets (legacy, disaggregated, and TFF in futures-only and combined variants, plus the CIT supplemental), rows typed per family with per-category positions and week-over-week changes, market presets (`COT_MARKETS`) with alias and historical-code resolution, network-free URL builders and column maps in `@xbbg/xnews/catalog`, a `cftc-cot` provider policy documenting Socrata throttling and the Friday 15:30 ET release cadence, and a `smoke:cot` live gate.
 - Added FFIEC CDR bulk data as the second data provider (`fetchFfiecCallReport`, `ffiecCallDataSource`, `downloadFfiecBulkData`, `ffiecReleaseToNewsItems`): quarterly Call Report bulk archives fetched by driving the CDR page's stateful ASP.NET postback chain (session cookies plus `__VIEWSTATE` threading), a dependency-free ZIP reader over the runtime's `DecompressionStream`, and pure bundle parsers for single-period call reports, the four-period subset, and UBPR ratios/ranks/stats TSVs (`parseFfiecCallBundle`, `parseFfiecFourPeriodBundle`, `parseFfiecUbprBundle`). All six CDR bulk products are downloadable in their TSV/XBRL formats; network-free form builders, product registry, and period helpers ship in `@xbbg/xnews/catalog`, and an `ffiec-cdr` provider policy records the session-cookie and archive-size facts.
 - Added `DataFetchOptions.ifNewerThan`, a skip hint the release watcher now passes with the last seen `asOf` so heavy sources (FFIEC's ~6 MB archives) can answer "nothing new" from a cheap page probe instead of re-downloading; `DataRelease.updatedAt` carries the publisher's revision stamp (FFIEC's "Call Updated") beside the reporting-period `asOf`.
@@ -74,6 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data releases with zero rows are successful dated releases rather than no-data results; data watchers reject malformed checkpoints before polling and reject invalid release dates or sequences without poisoning their checkpoint.
 - A response that breaches the byte ceiling now names `maxResponseBytes` in its message, because the fix is to raise the ceiling and the old wording did not say so. The code stays `network`: `config` is reserved for preconditions a caller must satisfy before a request is attempted, which both lanes report as `disabled`.
 - The npm description and keywords now name research papers, central-bank publications, structured economic data, and the document formats the package reads (`epub`, `pdf`, `ocr`, `text-extraction`, `open-library`), so registry discovery reflects the package's lanes rather than market news and transcription alone.
+- `postJson` now sends `Accept: application/json`; content-negotiating APIs such
+  as USAspending no longer return a browsable HTML page with HTTP 200.
 
 ## [0.1.1] - 2026-07-28
 

@@ -230,6 +230,14 @@ These providers query their upstream endpoint per subject.
 | `hf-papers`        | company, topic         | companyName or ticker | Hugging Face daily AI papers, filtered locally (opt-in)                                                                                         |
 | `osf-preprints`    | company, topic         | companyName or ticker | OSF preprints across community archives, filtered locally (opt-in; `osfProviders`)                                                              |
 
+OFAC and WHO expose publisher-wide lists rather than subject-query endpoints; xnews filters them
+locally using the same company/topic matcher as fixed feeds:
+
+| Provider        | Capabilities   | Feed                                      |
+| --------------- | -------------- | ----------------------------------------- |
+| `ofac`          | company, topic | US Treasury OFAC recent sanctions actions |
+| `who-outbreaks` | company, topic | WHO Disease Outbreak News                 |
+
 `since`/`until` date windows are forwarded upstream where the endpoint supports them (`gdelt`, `sec-fulltext`, `federal-register`, `courtlistener`, arXiv submitted dates, OpenAlex publication dates, Crossref publication dates, Europe PMC `FIRST_PDATE`, World Bank document dates, bioRxiv/medRxiv detail windows, and OSF publication dates) and always enforced locally after fetching. `msrb-emma` maps `since` onto EMMA's fixed posting windows: it fetches Today+Yesterday by default and widens to ThisWeek/LastWeek (EMMA's maximum lookback) when the window reaches further back.
 
 Using `msrb-emma` requires `msrbAcceptTermsOfUse: true`. Setting the flag records the caller's acceptance of EMMA's Terms of Use.
@@ -425,6 +433,138 @@ console.log(result.items.length);
 ```
 
 A watchlist result includes per-subject `NewsFeedResult` values, one merged top-level `items` list, flattened provider rows, flattened warnings, and a top-level `partial` flag.
+
+## Live markets, world data, and active events
+
+The public source surface also covers current prices and probabilities, federal money, macro and
+climate series, active hazards, infrastructure status, humanitarian conditions, and geospatial
+observations. The adapters use four shapes deliberately:
+
+- **News:** dated titled documents (`NewsItem`) — OFAC sanctions actions and WHO Disease Outbreak
+  News join company/topic feeds as opt-in providers (`ofac`, `who-outbreaks`) and filter locally.
+- **Data:** dated structured snapshots (`DataSource<Row>`) — economic, climate, federal-spending,
+  cyber, attention, and humanitarian datasets use `fetchDataRelease` and
+  `createDataReleaseWatcher`.
+- **Events:** the set of things currently in force (`EventSource`) — warnings, storms, outages,
+  geohazards, and observations use `fetchEventSnapshot`, `fetchEventsAcross`, and
+  `createEventWatcher`.
+- **Current state:** quotes, prediction markets, camera directories, and territory geometry have no
+  release cadence, so they expose typed fetch functions directly.
+
+### Prices and prediction markets
+
+```ts
+import {
+  fetchKalshiMarkets,
+  fetchPolymarketMarkets,
+  fetchYahooBars,
+  fetchYahooQuote,
+} from "@xbbg/xnews";
+
+const oil = await fetchYahooQuote("CL=F");
+const vix = await fetchYahooBars("^VIX", { interval: "1d", range: "1mo" });
+const [kalshi, polymarket] = await Promise.all([
+  fetchKalshiMarkets({ limit: 25 }),
+  fetchPolymarketMarkets({ limit: 25 }),
+]);
+```
+
+`fetchYahooQuote` and `fetchYahooBars` use Yahoo's keyless chart API with `query1` → `query2`
+failover; `YAHOO_FUTURES_SYMBOLS` provides the common futures, volatility, dollar-index, and
+Treasury-yield symbols. Kalshi, Polymarket, and Manifold normalize YES probability to `0–1` in one
+`PredictionMarketQuote` shape. Kalshi's current API reports decimal-string dollar prices
+(`yes_bid_dollars`/`yes_ask_dollars`); xnews divides price by contract notional rather than applying
+the obsolete integer-cent conversion.
+
+### New structured-data sources
+
+| Domain               | Provider / factory                                                                            | Published data                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Federal money        | `usaSpendingDataSource`, `grantsGovDataSource`                                                | Contract awards; open grant opportunities                                              |
+| Macro                | `worldBankIndicatorDataSource`                                                                | World Bank CPI inflation, unemployment, GDP growth, poverty, or any raw indicator code |
+| Climate              | `noaaOniDataSource`, `droughtMonitorDataSource`, `noaaCo2DataSource`, `nasaGistempDataSource` | ENSO/ONI, US drought coverage, atmospheric CO₂, global temperature anomaly             |
+| Power                | `carbonIntensityDataSource`, `caisoFuelMixDataSource`                                         | GB carbon intensity/generation mix; CAISO five-minute fuel mix                         |
+| Cyber/infrastructure | `cisaKevDataSource`, `iodaDataSource`, `ooniDataSource`                                       | Known-exploited vulnerabilities, country internet outages, censorship anomalies        |
+| Attention/audit      | `wikipediaPageviewsDataSource`, `wikipediaCongressEditsDataSource`                            | Daily top articles; 13,269 historical edits from US congressional networks             |
+| Public health        | `cdcWastewaterDataSource`                                                                     | CDC wastewater activity                                                                |
+| Humanitarian         | `unhcrDataSource`, `hungerMapDataSource`                                                      | Forced displacement; WFP food-security estimates                                       |
+
+World Bank `country/all` results mark aggregates explicitly with `isAggregate`; they are not mixed
+silently into sovereign-country analysis. Wikimedia pageviews default to the most recent published
+day because yesterday's ranking is commonly unavailable for the first hours of a UTC day.
+`wikipediaCongressEditsDataSource` reads the `anon-history` archive generated from Wikimedia dumps,
+classifies each edit with the archive's complete House/Senate range manifest, and exposes chamber,
+date, and limit filters. Its coverage is explicitly historical: 13,269 English-Wikipedia edits from
+`2003-11-10` through `2014-07-07`. It is **not** a current detector—Wikimedia temporary accounts
+removed public IP attribution for logged-out edits by late 2025. The CDC and CFTC adapters share a
+generic network-free `socrataResourceUrl` builder; COT-specific columns and filters remain layered
+above it.
+
+WFP withdrew anonymous HungerMap access: `hungerMapDataSource()` without an `apiKey` returns lane
+status `disabled` before network I/O. Supply a WFP-issued token to use the live endpoint:
+
+```ts
+const foodSecurity = await fetchDataRelease(
+  hungerMapDataSource({ apiKey: process.env.WFP_HUNGERMAP_API_KEY }),
+);
+```
+
+### Active events lane
+
+`DataRelease.asOf` cannot model a warning set that changes continuously: a daily key would emit at
+most once per day, while a poll timestamp would replay the whole set every poll. `EventSource`
+therefore returns an `EventSnapshot`; `createEventWatcher` remembers stable event ids and yields
+only newly appeared records. The id set is bounded with oldest-first eviction.
+
+```ts
+import {
+  createEventWatcher,
+  fetchEventsAcross,
+  gdacsSource,
+  nwsAlertsSource,
+  usgsVolcanoesSource,
+} from "@xbbg/xnews";
+
+const current = await fetchEventsAcross([nwsAlertsSource(), gdacsSource(), usgsVolcanoesSource()], {
+  minSeverity: "severe",
+});
+
+for await (const result of createEventWatcher(nwsAlertsSource(), {
+  minSeverity: "severe",
+  intervalMs: 5 * 60_000,
+})) {
+  for (const event of result.events) console.log(event.title);
+}
+```
+
+| Provider id          | Factory               | Active state                                                   |
+| -------------------- | --------------------- | -------------------------------------------------------------- |
+| `nws-alerts`         | `nwsAlertsSource`     | US weather, flood, and civil alerts                            |
+| `nhc-storms`         | `nhcStormsSource`     | Active tropical cyclones and advisories                        |
+| `gdacs`              | `gdacsSource`         | Global earthquakes, floods, storms, droughts, fires, volcanoes |
+| `usgs-volcanoes`     | `usgsVolcanoesSource` | Elevated USGS volcanoes enriched with Smithsonian coordinates  |
+| `noaa-tsunami`       | `noaaTsunamiSource`   | National/Alaska and Pacific tsunami-center messages            |
+| `glofas-flood`       | `glofasFloodSource`   | 31-day discharge outlook for 22 major river basins             |
+| `gdelt-events`       | `gdeltEventsSource`   | Latest geocoded GDELT v2 event slice                           |
+| `faa-status`         | `faaStatusSource`     | Ground stops, closures, and airport delays                     |
+| `safecast-radiation` | `safecastSource`      | Recent geolocated radiation observations                       |
+| `sondehub-balloons`  | `sondeHubSource`      | Latest telemetry per active radiosonde                         |
+
+Event severity is normalized but provenance stays explicit. GloFAS supplies discharge rather than
+an official alert class, so its severity is named and documented as an **xnews-derived**
+forecast-to-baseline ratio. Safecast CPM is device-dependent and remains `unknown` severity rather
+than being mislabeled as dose. GDELT FIPS country codes are converted to ISO-3166 alpha-2 or omitted;
+they are never passed through under the wrong standard.
+
+### Geospatial directories and geometry
+
+`fetchTrafficCameras` fans out over NYC, London TfL, Delaware, and New Zealand camera directories;
+one network failure does not discard the others. `fetchDeepStateMapFrontline` preserves the
+territorial-control polygons as geometry instead of replacing them with misleading centroids.
+
+Run `bun run smoke:world` to exercise every source above against its live endpoint. Seasonal feeds
+may legitimately report no active events; transport, schema, field-scale, and required-always-row
+failures make the smoke exit non-zero.
 
 ## Structured data releases (FRED, CFTC COT, FFIEC bank data, DTCC swaps)
 

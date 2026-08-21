@@ -64,9 +64,13 @@ export async function fetchJsonText(
 
 /**
  * POSTs a JSON body and returns the response text, with `fetchText`'s
- * timeout, abort, redirect, and error semantics. `init.headers` carries
- * per-request headers such as an `Authorization` bearer token; host policy
- * headers still win on collision.
+ * timeout, abort, redirect, and error semantics. Announces
+ * `Accept: application/json` for the same reason `fetchJsonText` does: an API
+ * that content-negotiates will answer the default feed-oriented `Accept` with
+ * a browsable HTML page (USAspending's DRF surface does exactly this, with a
+ * 200). `init.headers` carries per-request headers such as an `Authorization`
+ * bearer token and overrides the default `Accept`; host policy headers still
+ * win on collision.
  */
 export async function postJson(
   url: string,
@@ -81,7 +85,7 @@ export async function postJson(
     init.userAgent ?? requestUserAgent,
     options.userAgent !== undefined && requestUserAgent === options.userAgent,
     { contentType: "application/json", content: JSON.stringify(body) },
-    init.headers,
+    { Accept: "application/json", ...init.headers },
   );
   return utf8Decoder.decode(result.bytes);
 }

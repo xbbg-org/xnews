@@ -1,5 +1,6 @@
 import { normalizeDateOnly } from "../dates.js";
 import { normalizeLimit } from "../options.js";
+import { quoteSoqlString, socrataResourceUrl } from "./socrata.urls.js";
 import type { SourceFetchOptions } from "../types.js";
 
 /**
@@ -502,13 +503,13 @@ export function cotReportUrl(
 ): string {
   const definition = requireDataset(dataset);
   const where = cotWhereClause(options);
-  const url = new URL(`${SOCRATA_BASE}/resource/${definition.socrataId}.json`);
-  url.searchParams.set("$select", cotSelectColumns(definition.family).join(","));
-  if (where) url.searchParams.set("$where", where);
-  url.searchParams.set("$order", `${REPORT_DATE_COLUMN} DESC,cftc_contract_market_code`);
-  url.searchParams.set("$limit", String(cotRowLimit(options.limit)));
-  if (options.appToken) url.searchParams.set("$$app_token", options.appToken);
-  return url.toString();
+  return socrataResourceUrl(SOCRATA_BASE, definition.socrataId, {
+    select: cotSelectColumns(definition.family),
+    ...(where !== undefined ? { where } : {}),
+    order: `${REPORT_DATE_COLUMN} DESC,cftc_contract_market_code`,
+    limit: cotRowLimit(options.limit),
+    ...(options.appToken ? { appToken: options.appToken } : {}),
+  });
 }
 
 /** Builds the one-row probe for a dataset's most recent report date. */
@@ -517,12 +518,12 @@ export function cotLatestDateUrl(
   options: Pick<CotReportUrlOptions, "markets" | "appToken"> = {},
 ): string {
   const definition = requireDataset(dataset);
-  const url = new URL(`${SOCRATA_BASE}/resource/${definition.socrataId}.json`);
-  url.searchParams.set("$select", `max(${REPORT_DATE_COLUMN}) AS latest`);
   const where = cotWhereClause(options);
-  if (where) url.searchParams.set("$where", where);
-  if (options.appToken) url.searchParams.set("$$app_token", options.appToken);
-  return url.toString();
+  return socrataResourceUrl(SOCRATA_BASE, definition.socrataId, {
+    select: `max(${REPORT_DATE_COLUMN}) AS latest`,
+    ...(where !== undefined ? { where } : {}),
+    ...(options.appToken ? { appToken: options.appToken } : {}),
+  });
 }
 
 /** Human-facing Socrata page for a dataset. */
@@ -552,14 +553,14 @@ function cotWhereClause(options: Omit<CotReportUrlOptions, "limit">): string | u
   const clauses: string[] = [];
   if (options.markets?.length) {
     const codes = resolveCotMarketCodes(options.markets);
-    clauses.push(`cftc_contract_market_code in (${codes.map(quoteSoql).join(",")})`);
+    clauses.push(`cftc_contract_market_code in (${codes.map(quoteSoqlString).join(",")})`);
   }
   const asOf = requireDateOnly(options.asOf, "asOf");
-  if (asOf) clauses.push(`${REPORT_DATE_COLUMN} = ${quoteSoql(asOf)}`);
+  if (asOf) clauses.push(`${REPORT_DATE_COLUMN} = ${quoteSoqlString(asOf)}`);
   const since = requireDateOnly(options.since, "since");
-  if (since) clauses.push(`${REPORT_DATE_COLUMN} >= ${quoteSoql(since)}`);
+  if (since) clauses.push(`${REPORT_DATE_COLUMN} >= ${quoteSoqlString(since)}`);
   const until = requireDateOnly(options.until, "until");
-  if (until) clauses.push(`${REPORT_DATE_COLUMN} <= ${quoteSoql(until)}`);
+  if (until) clauses.push(`${REPORT_DATE_COLUMN} <= ${quoteSoqlString(until)}`);
   return clauses.length > 0 ? clauses.join(" AND ") : undefined;
 }
 
@@ -571,10 +572,6 @@ function cotRowLimit(limit: number | undefined): number {
     );
   }
   return normalized;
-}
-
-function quoteSoql(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function requireDateOnly(

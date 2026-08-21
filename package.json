@@ -87,6 +87,7 @@
     "smoke:research": "bun run ./scripts/smoke-research.ts",
     "smoke:works": "bun run ./scripts/smoke-works.ts",
     "smoke:cot": "bun run ./scripts/smoke-cot.ts",
+    "smoke:world": "bun run ./scripts/smoke-world-sources.ts",
     "smoke:dtcc": "bun run ./scripts/smoke-dtcc.ts",
     "smoke:ffiec": "bun run ./scripts/smoke-ffiec.ts",
     "smoke:ffiec-002": "bun run ./scripts/smoke-ffiec-002.ts",

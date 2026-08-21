@@ -100,7 +100,9 @@ export type NewsProvider =
   | "rba-research"
   | "banco-de-espana-research"
   | "banca-ditalia-research"
-  | "dnb-research";
+  | "dnb-research"
+  | "ofac"
+  | "who-outbreaks";
 
 export type NewsProviderCapability = "company" | "topic" | "filing";
 
@@ -465,6 +467,155 @@ export interface DataReleaseWatcherOptions extends SourceFetchOptions {
    * than this are yielded, so restarts do not replay consumed releases.
    */
   readonly sinceSequence?: number;
+}
+
+/**
+ * Built-in event providers. The events lane carries *active-state* feeds:
+ * publishers that answer with the set of things currently in force — storm
+ * warnings, elevated volcanoes, airport ground stops, outage summaries —
+ * rather than a dated release or a bibliographic record.
+ *
+ * Neither existing lane fits. `DataRelease` is keyed on `asOf` and
+ * `createDataReleaseWatcher` dedupes on it, so an alert set that changes
+ * continuously would yield at most once per day. `NewsItem` has no geometry
+ * and no lifecycle window. So the events lane has its own machinery
+ * (see `src/events.ts`), which dedupes on event id and yields events as they
+ * *appear*, the way `createTopicNewsWatcher` does for documents.
+ */
+export type EventProvider =
+  | "nws-alerts"
+  | "gdacs"
+  | "nhc-storms"
+  | "usgs-volcanoes"
+  | "noaa-tsunami"
+  | "glofas-flood"
+  | "gdelt-events"
+  | "faa-status"
+  | "safecast-radiation"
+  | "sondehub-balloons";
+
+/**
+ * What an event is about. Deliberately coarse: consumers filter on this
+ * before reading provider-native fields, so it stays stable as providers
+ * are added.
+ */
+export type EventCategory =
+  | "hazard"
+  | "weather"
+  | "seismic"
+  | "flood"
+  | "conflict"
+  | "outage"
+  | "aviation"
+  | "radiation"
+  | "atmospheric"
+  | "unknown";
+
+/**
+ * Normalized urgency, mapped from each publisher's native scale (NWS
+ * `severity`, GDACS alert colour, USGS volcano alert level). `unknown` means
+ * the publisher stated nothing recognized — never a silent downgrade to
+ * `minor`, because an unranked alert is not a mild one.
+ */
+export type EventSeverity = "extreme" | "severe" | "moderate" | "minor" | "unknown";
+
+/**
+ * One active event or observation. Geometry is optional: some publishers in
+ * this lane (FAA airport status) state a place but no coordinates, and a
+ * fabricated centroid would read as measured position.
+ */
+export interface EventRecord {
+  /** Provider-native id where one exists, else derived; stable within `provider`. */
+  readonly id: string;
+  readonly provider: EventProvider;
+  readonly category: EventCategory;
+  readonly title: string;
+  readonly summary?: string;
+  /** Canonical human-facing URL, when the publisher exposes one. */
+  readonly url?: string;
+  /** ISO instant the publisher stated this record; absent when unstated. */
+  readonly observedAt?: string;
+  /** Lifecycle window, for events that declare one (warning in force). */
+  readonly startsAt?: string;
+  readonly endsAt?: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly severity: EventSeverity;
+  /**
+   * The publisher's own scalar, unconverted — earthquake magnitude, alert
+   * level, river discharge, µSv/h. Meaning is provider-specific; read it
+   * with `magnitudeUnit`.
+   */
+  readonly magnitude?: number;
+  readonly magnitudeUnit?: string;
+  /** ISO 3166-1 alpha-2 where the publisher states a country. */
+  readonly countryCode?: string;
+  readonly areaName?: string;
+  /** Provider-native classification, verbatim (NWS `event`, GDACS `eventtype`). */
+  readonly eventType?: string;
+}
+
+/**
+ * The set of events in force at one moment. A snapshot is the whole current
+ * state, not a delta: `createEventWatcher` computes deltas by id.
+ */
+export interface EventSnapshot {
+  readonly provider: EventProvider;
+  readonly dataset: string;
+  /** ISO instant the snapshot was taken. */
+  readonly observedAt: string;
+  readonly events: readonly EventRecord[];
+  readonly warnings: readonly string[];
+  readonly requestUrls: readonly string[];
+}
+
+/**
+ * Binds one active-state publisher to its transport. Built-in providers
+ * export factories returning sources (see `nwsAlertsSource`); consumers can
+ * implement `EventSource` for their own publishers and reuse the lane.
+ */
+export interface EventSource {
+  readonly provider: EventProvider;
+  readonly dataset: string;
+  /** URLs the next `fetchSnapshot` call would dial, for observability. */
+  requestUrls(options?: EventFetchOptions): readonly string[];
+  /** Resolves `undefined` when the publisher currently reports nothing active. */
+  fetchSnapshot(options?: EventFetchOptions): Promise<EventSnapshot | undefined>;
+}
+
+export interface EventFetchOptions extends SourceFetchOptions {
+  /** Drop events below this normalized urgency. */
+  readonly minSeverity?: EventSeverity;
+  /** Restrict to these ISO 3166-1 alpha-2 countries, where the publisher states one. */
+  readonly countryCodes?: readonly string[];
+}
+
+/** Uniform non-throwing outcome envelope for one snapshot fetch. */
+export interface EventProviderResult {
+  readonly provider: EventProvider;
+  readonly dataset: string;
+  readonly status: ProviderStatus;
+  /** Present unless the fetch failed or found nothing active. */
+  readonly snapshot?: EventSnapshot;
+  readonly events: readonly EventRecord[];
+  readonly eventCount: number;
+  readonly warnings: readonly string[];
+  readonly fetchedAt: string;
+  readonly durationMs: number;
+  readonly requestUrls: readonly string[];
+  readonly error?: ProviderError;
+}
+
+export interface EventWatcherOptions extends EventFetchOptions {
+  /** Poll interval in milliseconds; defaults to 5 minutes. */
+  readonly intervalMs?: number;
+  /** Event ids already consumed, so a restart does not replay them. */
+  readonly seenIds?: Iterable<string>;
+  /**
+   * Cap on remembered ids, bounding memory on high-churn publishers.
+   * Defaults to 10000; oldest ids are evicted first.
+   */
+  readonly maxSeenIds?: number;
 }
 
 /**

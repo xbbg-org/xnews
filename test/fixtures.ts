@@ -472,3 +472,18 @@ export const youtubeSrv3TranscriptFixture = `<?xml version="1.0" encoding="utf-8
 <p t="8140" d="1000" w="1">plain text line</p>
 </body>
 </timedtext>`;
+
+/**
+ * Resolves the URL of an injected-fetch call. `RequestInfo | URL` includes
+ * `Request`, which stringifies to `[object Object]`, so tests must read `.url`
+ * rather than coercing the input.
+ */
+export function fetchInputUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+/** Reads an injected-fetch request body as text without coercing a non-string. */
+export function requestBodyText(body: BodyInit | null | undefined): string {
+  return typeof body === "string" ? body : "";
+}

@@ -76,6 +76,26 @@ test("transport enforces redirect semantics before the injected fetch", async ()
   });
   expect(failure.message).not.toContain("secret");
 });
+test("postJson asks content-negotiating APIs for JSON", async () => {
+  const acceptHeaders: (string | null)[] = [];
+  const contentTypes: (string | null)[] = [];
+  const body = await postJson(
+    "https://example.com/api",
+    { hello: "world" },
+    {
+      fetch: async (_input, init) => {
+        const headers = new Headers(init?.headers);
+        acceptHeaders.push(headers.get("accept"));
+        contentTypes.push(headers.get("content-type"));
+        return new Response('{"ok":true}');
+      },
+    },
+  );
+
+  expect(body).toBe('{"ok":true}');
+  expect(acceptHeaders).toEqual(["application/json"]);
+  expect(contentTypes).toEqual(["application/json"]);
+});
 
 test("transport cancels discarded redirect and error response bodies", async () => {
   let followedRedirectCancellations = 0;

@@ -37,6 +37,7 @@ import { fetchMsrbEmmaDisclosures, msrbEmmaCdUrl, msrbEmmaPeriods } from "./sour
 import { fetchNasdaqNews, nasdaqRssUrl } from "./sources/nasdaq.js";
 import { fetchNberWorkingPapers, nberListingUrl } from "./sources/nber.js";
 import { fetchSecFilings, secCompanyAtomUrl } from "./sources/sec.js";
+import { fetchOfacActions, OFAC_RECENT_ACTIONS_URL } from "./sources/ofac.js";
 import { fetchOpenAlexWorks, openAlexWorksUrl } from "./sources/openalex.js";
 import { fetchOsfPreprints, osfPreprintsUrl } from "./sources/osf.js";
 import { fetchSecCurrentFilings, secCurrentAtomUrl } from "./sources/seccurrent.js";
@@ -45,6 +46,7 @@ import { fetchSeekingAlphaNews, seekingAlphaRssUrl } from "./sources/seekingalph
 import { fetchSsrnPapers, ssrnPapersUrl } from "./sources/ssrn.js";
 import { fetchTickerTickNews, tickerTickFeedUrl } from "./sources/tickertick.js";
 import { fetchWorldBankDocuments, worldBankDocumentsUrl } from "./sources/worldbank.js";
+import { fetchWhoOutbreaks, WHO_DISEASE_OUTBREAK_NEWS_URL } from "./sources/whooutbreaks.js";
 import { fetchYahooFinanceNews, yahooFinanceRssUrl } from "./sources/yahoo.js";
 import { fetchYahooSearchNews, yahooSearchUrl } from "./sources/yahoosearch.js";
 import type {
@@ -125,6 +127,8 @@ const QUERY_PROVIDER_CAPABILITIES: Partial<
   "europe-pmc": ["company", "topic"],
   "hf-papers": ["company", "topic"],
   "osf-preprints": ["company", "topic"],
+  ofac: ["company", "topic"],
+  "who-outbreaks": ["company", "topic"],
   youtube: [],
   "cftc-cot": [],
   "ffiec-cdr": [],
@@ -599,6 +603,10 @@ async function fetchSource(
   if (isFixedFeedProvider(provider))
     return fetchFixedFeedNews(provider, subjectMatchTerms(subject), options);
   if (provider === "finviz") return fetchFinvizNews(requiredTicker(provider, subject), options);
+  if (provider === "ofac") return fetchOfacActions(subjectMatchTerms(subject), options);
+  if (provider === "who-outbreaks") {
+    return fetchWhoOutbreaks(subjectMatchTerms(subject), options);
+  }
   if (
     provider === "youtube" ||
     provider === "cftc-cot" ||
@@ -740,6 +748,8 @@ function providerRequestUrls(
   if (provider === "bis-research-hub") return [BIS_RESEARCH_HUB_RSS_URL];
   if (isFixedFeedProvider(provider)) return FIXED_FEEDS[provider].urls;
   if (provider === "finviz") return [finvizQuoteUrl(requiredTicker(provider, subject))];
+  if (provider === "ofac") return [OFAC_RECENT_ACTIONS_URL];
+  if (provider === "who-outbreaks") return [WHO_DISEASE_OUTBREAK_NEWS_URL];
   return unreachableProvider(provider);
 }
 

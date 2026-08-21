@@ -92,6 +92,8 @@ export {
 export type { LibgenBook, LibgenPage, LibgenParseOptions, LibgenRawRow } from "./sources/libgen.js";
 export { parseMsrbEmmaDisclosures } from "./sources/msrbemma.js";
 export { parseNasdaqNews } from "./sources/nasdaq.js";
+export { parseOfacActions } from "./sources/ofac.js";
+export { parseWhoOutbreaks } from "./sources/whooutbreaks.js";
 export { parseOpenAlexWorks } from "./sources/openalex.js";
 export type { OpenAlexWorksPage } from "./sources/openalex.js";
 export { parseOpenLibraryWorks } from "./sources/openlibrary.js";
@@ -102,6 +104,8 @@ export { parseSecFullTextFilings } from "./sources/secfulltext.js";
 export { parseSeekingAlphaNews } from "./sources/seekingalpha.js";
 export { parseTickerTickNews } from "./sources/tickertick.js";
 export { parseYahooFinanceNews } from "./sources/yahoo.js";
+export { parseYahooChart } from "./sources/yahooquotes.js";
+export type { YahooBar, YahooChartResult, YahooQuote } from "./sources/yahooquotes.js";
 export { parseYahooSearchNews } from "./sources/yahoosearch.js";
 export { parseYoutubeChannelVideos } from "./sources/youtube.js";
 export {
@@ -186,3 +190,86 @@ export type {
   FfiecE16Table,
   FfiecE16Workbook,
 } from "./sources/ffiece16.js";
+export { parseWikipediaPageviews } from "./sources/wikipediapageviews.js";
+export type {
+  WikipediaPageviewRow,
+  WikipediaPageviewsParseOptions,
+} from "./sources/wikipediapageviews.js";
+export {
+  parseCongressionalIpRanges,
+  parseWikipediaCongressEdits,
+} from "./sources/wikipediacongressedits.js";
+export type {
+  CongressChamber,
+  CongressionalIpRange,
+  WikipediaCongressEditRow,
+} from "./sources/wikipediacongressedits.js";
+
+export { parseWorldBankIndicator } from "./sources/worldbankindicators.js";
+export type { WorldBankIndicatorRow } from "./sources/worldbankindicators.js";
+
+export { parseKalshiMarkets } from "./sources/kalshi.js";
+export { parsePolymarketMarkets } from "./sources/polymarket.js";
+export { parseManifoldMarkets } from "./sources/manifold.js";
+export type { PredictionMarketQuote } from "./sources/predictionmarket.urls.js";
+
+export { parseNwsAlerts } from "./sources/nwsalerts.js";
+export { parseNhcStorms } from "./sources/nhcstorms.js";
+export { parseGdacs } from "./sources/gdacs.js";
+
+export { parseUsaSpendingAwards } from "./sources/usaspending.js";
+export type { UsaSpendingAwardRow } from "./sources/usaspending.js";
+export { parseGrantsGovDate, parseGrantsGovOpportunities } from "./sources/grantsgov.js";
+export type { GrantsGovOpportunityRow } from "./sources/grantsgov.js";
+
+export { parseCdcWastewater } from "./sources/cdcwastewater.js";
+export type { CdcWastewaterRow } from "./sources/cdcwastewater.js";
+export { parseUnhcrDisplacement } from "./sources/unhcr.js";
+export type { UnhcrDisplacementRow } from "./sources/unhcr.js";
+export { parseHungerMapFoodSecurity } from "./sources/hungermap.js";
+export type { HungerMapFoodSecurityRow } from "./sources/hungermap.js";
+
+export { parseNoaaOni } from "./sources/noaaoni.js";
+export type { NoaaOniRow } from "./sources/noaaoni.js";
+export { parseDroughtMonitor } from "./sources/droughtmonitor.js";
+export type { DroughtMonitorRow } from "./sources/droughtmonitor.js";
+export { parseCarbonIntensity } from "./sources/carbonintensity.js";
+export type { CarbonIntensityRow } from "./sources/carbonintensity.js";
+export { parseCaisoFuelMix } from "./sources/caiso.js";
+export type { CaisoFuelMixRow } from "./sources/caiso.js";
+export { parseNoaaCo2 } from "./sources/noaaco2.js";
+export type { NoaaCo2Row } from "./sources/noaaco2.js";
+export { parseNasaGistemp, parseNasaGistempAnnualMeans } from "./sources/nasagistemp.js";
+export type { NasaGistempAnnualMean, NasaGistempRow } from "./sources/nasagistemp.js";
+
+export { parseCisaKev } from "./sources/cisakev.js";
+export type { CisaKevRow } from "./sources/cisakev.js";
+export { parseFaaStatus } from "./sources/faastatus.js";
+export { parseIodaOutages } from "./sources/ioda.js";
+export type { IodaOutageRow } from "./sources/ioda.js";
+export { parseOoniCensorship } from "./sources/ooni.js";
+export type { OoniCensorshipRow } from "./sources/ooni.js";
+
+export { parseGdeltExportTsv, parseGdeltLastUpdate } from "./sources/gdeltevents.js";
+export type { GdeltExportSlice } from "./sources/gdeltevents.js";
+
+export { parseSafecastMeasurements } from "./sources/safecast.js";
+export { parseSondeHubTelemetry } from "./sources/sondehub.js";
+export {
+  parseDelDotTrafficCameras,
+  parseNycTrafficCameras,
+  parseNztaTrafficCameras,
+  parseTflTrafficCameras,
+} from "./sources/trafficcams.js";
+export type { CameraRecord } from "./sources/trafficcams.js";
+export { parseDeepStateMapFrontline } from "./sources/deepstatemap.js";
+export type { FrontlineFeature, FrontlineSnapshot } from "./sources/deepstatemap.js";
+
+export {
+  parseUsgsVolcanoAlerts,
+  parseUsgsVolcanoCoordinates,
+  parseUsgsVolcanoEvents,
+} from "./sources/usgsvolcanoes.js";
+export type { UsgsVolcanoAlert, UsgsVolcanoCoordinate } from "./sources/usgsvolcanoes.js";
+export { parseNoaaTsunamiAtom, parseNoaaTsunamiEvents } from "./sources/noaatsunami.js";
+export { parseGlofasFloodEvents } from "./sources/glofasflood.js";

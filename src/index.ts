@@ -6,6 +6,15 @@ export type {
   DataRelease,
   DataReleaseWatcherOptions,
   DataSource,
+  EventCategory,
+  EventFetchOptions,
+  EventProvider,
+  EventProviderResult,
+  EventRecord,
+  EventSeverity,
+  EventSnapshot,
+  EventSource,
+  EventWatcherOptions,
   MarketEventKind,
   NewsFeedOptions,
   NewsFeedQuery,
@@ -157,6 +166,14 @@ export {
 } from "./feed.js";
 export { classifyMarketEvent } from "./classify.js";
 export { createDataReleaseWatcher, fetchDataRelease } from "./data.js";
+export {
+  createEventWatcher,
+  fetchEventSnapshot,
+  fetchEventsAcross,
+  filterEvents,
+  meetsSeverity,
+  sortEvents,
+} from "./events.js";
 export {
   emptyWorkIdentity,
   extractIsbns,
@@ -483,6 +500,21 @@ export {
 export type { MsrbEmmaFetchOptions, MsrbEmmaPeriod } from "./sources/msrbemma.js";
 export { fetchNasdaqNews, nasdaqRssUrl, parseNasdaqNews } from "./sources/nasdaq.js";
 export {
+  OFAC_ACTION_LINK_PATTERN,
+  OFAC_BASE_URL,
+  OFAC_RECENT_ACTIONS_URL,
+  fetchOfacActions,
+  ofacActionDate,
+  parseOfacActions,
+} from "./sources/ofac.js";
+export {
+  WHO_BASE_URL,
+  WHO_DISEASE_OUTBREAK_NEWS_URL,
+  fetchWhoOutbreaks,
+  parseWhoOutbreaks,
+  whoOutbreakUrl,
+} from "./sources/whooutbreaks.js";
+export {
   NBER_RSS_URL,
   fetchNberRecentPapers,
   fetchNberWorkingPapers,
@@ -634,6 +666,23 @@ export {
   parseYahooFinanceNews,
   yahooFinanceRssUrl,
 } from "./sources/yahoo.js";
+export {
+  YAHOO_FUTURES_SYMBOLS,
+  fetchYahooBars,
+  fetchYahooQuote,
+  parseYahooChart,
+  yahooChartUrl,
+} from "./sources/yahooquotes.js";
+export type {
+  YahooBar,
+  YahooChartFetchOptions,
+  YahooChartHost,
+  YahooChartInterval,
+  YahooChartRange,
+  YahooChartResult,
+  YahooChartUrlOptions,
+  YahooQuote,
+} from "./sources/yahooquotes.js";
 export {
   fetchYahooSearchNews,
   parseYahooSearchNews,
@@ -918,3 +967,361 @@ export type {
   FfiecE16Table,
   FfiecE16Workbook,
 } from "./sources/ffiece16.js";
+export {
+  fetchWikipediaTopArticles,
+  parseWikipediaPageviews,
+  WIKIPEDIA_DEFAULT_ACCESS,
+  WIKIPEDIA_DEFAULT_PROJECT,
+  WIKIPEDIA_EXCLUDED_PREFIXES,
+  WIKIPEDIA_PAGEVIEWS_API_BASE_URL,
+  wikipediaPageviewsDataSource,
+  wikipediaPageviewsDate,
+  wikipediaPageviewsUrl,
+} from "./sources/wikipediapageviews.js";
+export type {
+  WikipediaPageviewRow,
+  WikipediaPageviewsAccess,
+  WikipediaPageviewsOptions,
+  WikipediaPageviewsParseOptions,
+  WikipediaPageviewsUrlOptions,
+} from "./sources/wikipediapageviews.js";
+export {
+  fetchWikipediaCongressEdits,
+  parseCongressionalIpRanges,
+  parseWikipediaCongressEdits,
+  WIKIPEDIA_CONGRESS_EDITS_ARCHIVE_BASE_URL,
+  WIKIPEDIA_CONGRESS_EDITS_ARCHIVE_ROW_COUNT,
+  WIKIPEDIA_CONGRESS_EDITS_COVERAGE_END,
+  WIKIPEDIA_CONGRESS_EDITS_COVERAGE_START,
+  WIKIPEDIA_CONGRESS_EDITS_DATA_URL,
+  WIKIPEDIA_CONGRESS_EDITS_PAGE_URL,
+  WIKIPEDIA_CONGRESS_EDITS_RANGES_URL,
+  wikipediaCongressEditsDataSource,
+} from "./sources/wikipediacongressedits.js";
+export type {
+  CongressChamber,
+  CongressionalIpRange,
+  WikipediaCongressEditRow,
+  WikipediaCongressEditsOptions,
+} from "./sources/wikipediacongressedits.js";
+
+export {
+  fetchWorldBankIndicator,
+  isWorldBankIndicatorAlias,
+  parseWorldBankIndicator,
+  WORLD_BANK_AGGREGATE_CODES,
+  WORLD_BANK_INDICATORS,
+  worldBankIndicatorDataSource,
+  worldBankIndicatorUrl,
+} from "./sources/worldbankindicators.js";
+export type {
+  WorldBankIndicatorAlias,
+  WorldBankIndicatorDataSourceOptions,
+  WorldBankIndicatorDefinition,
+  WorldBankIndicatorRow,
+} from "./sources/worldbankindicators.js";
+
+export { fetchKalshiMarkets, KALSHI_MARKETS_URL, parseKalshiMarkets } from "./sources/kalshi.js";
+export {
+  fetchPolymarketMarkets,
+  parsePolymarketMarkets,
+  POLYMARKET_MARKETS_URL,
+} from "./sources/polymarket.js";
+export {
+  fetchManifoldMarkets,
+  MANIFOLD_MARKETS_URL,
+  parseManifoldMarkets,
+} from "./sources/manifold.js";
+export type { PredictionMarketQuote } from "./sources/predictionmarket.urls.js";
+
+export {
+  fetchUsaSpendingAwards,
+  parseUsaSpendingAwards,
+  USASPENDING_AWARD_BASE_URL,
+  USASPENDING_AWARD_FIELDS,
+  USASPENDING_AWARD_TYPE_CODES,
+  USASPENDING_AWARDS_URL,
+  USASPENDING_DEFAULT_LIMIT,
+  USASPENDING_SEARCH_URL,
+  usaSpendingAwardUrl,
+  usaSpendingDataSource,
+  usaSpendingDateWindow,
+  usaSpendingSearchBody,
+} from "./sources/usaspending.js";
+export type {
+  UsaSpendingAwardRow,
+  UsaSpendingDateWindow,
+  UsaSpendingDateWindowOptions,
+  UsaSpendingFetchOptions,
+  UsaSpendingSearchBody,
+  UsaSpendingSearchBodyOptions,
+} from "./sources/usaspending.js";
+export {
+  fetchGrantsGovOpportunities,
+  GRANTS_GOV_DEFAULT_ROWS,
+  GRANTS_GOV_DETAIL_BASE_URL,
+  GRANTS_GOV_SEARCH_PAGE_URL,
+  GRANTS_GOV_SEARCH_URL,
+  grantsGovDataSource,
+  grantsGovOpportunityUrl,
+  grantsGovSearchBody,
+  parseGrantsGovDate,
+  parseGrantsGovOpportunities,
+} from "./sources/grantsgov.js";
+export type {
+  GrantsGovFetchOptions,
+  GrantsGovOpportunityRow,
+  GrantsGovSearchBody,
+  GrantsGovSearchBodyOptions,
+} from "./sources/grantsgov.js";
+
+export {
+  fetchNwsAlertsEvents,
+  NWS_ALERTS_URL,
+  nwsAlertsSource,
+  parseNwsAlerts,
+} from "./sources/nwsalerts.js";
+export {
+  fetchNhcStormsEvents,
+  NHC_CURRENT_STORMS_URL,
+  nhcStormsSource,
+  parseNhcStorms,
+} from "./sources/nhcstorms.js";
+export { fetchGdacsEvents, GDACS_EVENTS_URL, gdacsSource, parseGdacs } from "./sources/gdacs.js";
+
+export { quoteSoqlString, socrataResourceUrl } from "./sources/socrata.urls.js";
+export type { SocrataResourceUrlOptions } from "./sources/socrata.urls.js";
+export {
+  CDC_WASTEWATER_BASE_URL,
+  CDC_WASTEWATER_DATASET_URL,
+  CDC_WASTEWATER_DEFAULT_LIMIT,
+  CDC_WASTEWATER_RESOURCE_ID,
+  cdcWastewaterDataSource,
+  cdcWastewaterUrl,
+  fetchCdcWastewater,
+  parseCdcWastewater,
+} from "./sources/cdcwastewater.js";
+export type {
+  CdcWastewaterFetchOptions,
+  CdcWastewaterRow,
+  CdcWastewaterUrlOptions,
+} from "./sources/cdcwastewater.js";
+export {
+  fetchUnhcrDisplacement,
+  parseUnhcrDisplacement,
+  UNHCR_POPULATION_API_URL,
+  UNHCR_POPULATION_DEFAULT_LIMIT,
+  unhcrDataSource,
+  unhcrPopulationUrl,
+} from "./sources/unhcr.js";
+export type {
+  UnhcrDisplacementRow,
+  UnhcrFetchOptions,
+  UnhcrPopulationUrlOptions,
+} from "./sources/unhcr.js";
+export {
+  fetchHungerMapFoodSecurity,
+  HUNGERMAP_FOOD_SECURITY_URL,
+  hungerMapAuthHeaders,
+  hungerMapDataSource,
+  parseHungerMapFoodSecurity,
+} from "./sources/hungermap.js";
+export type {
+  HungerMapCredentials,
+  HungerMapFetchOptions,
+  HungerMapFoodSecurityRow,
+} from "./sources/hungermap.js";
+
+export {
+  fetchNoaaOni,
+  isNoaaOniSeason,
+  NOAA_ONI_CENTER_MONTHS,
+  NOAA_ONI_URL,
+  noaaOniAsOf,
+  noaaOniDataSource,
+  noaaOniPhase,
+  parseNoaaOni,
+} from "./sources/noaaoni.js";
+export type { NoaaOniPhase, NoaaOniRow, NoaaOniSeason } from "./sources/noaaoni.js";
+export {
+  DROUGHT_MONITOR_BASE_URL,
+  droughtMonitorApiDate,
+  droughtMonitorDataSource,
+  droughtMonitorUrl,
+  fetchDroughtMonitor,
+  parseDroughtMonitor,
+} from "./sources/droughtmonitor.js";
+export type {
+  DroughtMonitorFetchOptions,
+  DroughtMonitorRow,
+  DroughtMonitorUrlOptions,
+} from "./sources/droughtmonitor.js";
+export {
+  CARBON_GENERATION_URL,
+  CARBON_INTENSITY_URL,
+  carbonIntensityDataSource,
+  carbonIntensityUrls,
+  fetchCarbonIntensity,
+  parseCarbonIntensity,
+} from "./sources/carbonintensity.js";
+export type { CarbonIntensityRow } from "./sources/carbonintensity.js";
+export {
+  CAISO_FUEL_SOURCE_URL,
+  CAISO_TIME_ZONE,
+  caisoFuelMixDataSource,
+  caisoPacificDate,
+  fetchCaisoFuelMix,
+  parseCaisoFuelMix,
+} from "./sources/caiso.js";
+export type { CaisoFuelMixFetchOptions, CaisoFuelMixRow } from "./sources/caiso.js";
+export { fetchNoaaCo2, NOAA_CO2_URL, noaaCo2DataSource, parseNoaaCo2 } from "./sources/noaaco2.js";
+export type { NoaaCo2Row } from "./sources/noaaco2.js";
+export {
+  fetchNasaGistemp,
+  NASA_GISTEMP_URL,
+  nasaGistempDataSource,
+  nasaGistempMonthEnd,
+  parseNasaGistemp,
+  parseNasaGistempAnnualMeans,
+} from "./sources/nasagistemp.js";
+export type { NasaGistempAnnualMean, NasaGistempRow } from "./sources/nasagistemp.js";
+
+export {
+  CISA_KEV_CATALOG_URL,
+  CISA_KEV_DATASET,
+  CISA_KEV_FEED_URL,
+  CISA_KEV_PROVIDER,
+  cisaKevDataSource,
+  fetchCisaKev,
+  parseCisaKev,
+} from "./sources/cisakev.js";
+export type { CisaKevRow } from "./sources/cisakev.js";
+export {
+  FAA_STATUS_DATASET,
+  FAA_STATUS_PROVIDER,
+  FAA_STATUS_URL,
+  faaStatusSource,
+  fetchFaaStatus,
+  parseFaaStatus,
+} from "./sources/faastatus.js";
+export {
+  IODA_DATASET,
+  IODA_OUTAGES_BASE_URL,
+  IODA_OUTAGES_LIMIT,
+  IODA_PROVIDER,
+  fetchIodaOutages,
+  iodaDataSource,
+  iodaOutagesUrl,
+  parseIodaOutages,
+} from "./sources/ioda.js";
+export type { IodaOutageRow, IodaOutagesUrlOptions } from "./sources/ioda.js";
+export {
+  OONI_AGGREGATION_BASE_URL,
+  OONI_DATASET,
+  OONI_DEFAULT_LOOKBACK_DAYS,
+  OONI_PROVIDER,
+  fetchOoniCensorship,
+  ooniAggregationUrl,
+  ooniDataSource,
+  parseOoniCensorship,
+} from "./sources/ooni.js";
+export type { OoniCensorshipRow } from "./sources/ooni.js";
+
+export {
+  fetchGdeltEvents,
+  GDELT_EVENT_COLUMNS,
+  GDELT_EVENTS_BASE_URL,
+  GDELT_EVENTS_DATASET,
+  GDELT_EVENTS_LAST_UPDATE_URL,
+  gdeltEventsSource,
+  parseGdeltExportTsv,
+  parseGdeltLastUpdate,
+} from "./sources/gdeltevents.js";
+export type { GdeltExportSlice } from "./sources/gdeltevents.js";
+
+export {
+  SAFECAST_DATASET,
+  SAFECAST_MEASUREMENTS_URL,
+  SAFECAST_PROVIDER,
+  fetchSafecastMeasurements,
+  parseSafecastMeasurements,
+  safecastSource,
+} from "./sources/safecast.js";
+export {
+  SONDEHUB_DATASET,
+  SONDEHUB_PROVIDER,
+  SONDEHUB_TELEMETRY_URL,
+  fetchSondeHubTelemetry,
+  parseSondeHubTelemetry,
+  sondeHubSource,
+} from "./sources/sondehub.js";
+export {
+  DELDOT_TRAFFIC_CAMERAS_URL,
+  NYC_TRAFFIC_CAMERAS_URL,
+  NZTA_TRAFFIC_CAMERAS_URL,
+  TFL_TRAFFIC_CAMERAS_URL,
+  TRAFFIC_CAMERA_NETWORKS,
+  TRAFFIC_NZ_BASE_URL,
+  fetchDelDotTrafficCameras,
+  fetchNycTrafficCameras,
+  fetchNztaTrafficCameras,
+  fetchTflTrafficCameras,
+  fetchTrafficCameras,
+  parseDelDotTrafficCameras,
+  parseNycTrafficCameras,
+  parseNztaTrafficCameras,
+  parseTflTrafficCameras,
+} from "./sources/trafficcams.js";
+export type {
+  CameraRecord,
+  ImplementedTrafficCameraNetwork,
+  TrafficCameraFetchResult,
+  TrafficCameraNetwork,
+  TrafficCameraNetworkDefinition,
+  TrafficCameraNetworkError,
+} from "./sources/trafficcams.js";
+export {
+  DEEP_STATE_MAP_FRONTLINE_URL,
+  fetchDeepStateMapFrontline,
+  parseDeepStateMapFrontline,
+} from "./sources/deepstatemap.js";
+export type { FrontlineFeature, FrontlineSnapshot } from "./sources/deepstatemap.js";
+
+export {
+  GVP_VOLCANO_TYPE_NAME,
+  GVP_VOLCANO_WFS_URL,
+  USGS_ELEVATED_VOLCANOES_URL,
+  fetchUsgsVolcanoEvents,
+  gvpVolcanoCoordinatesUrl,
+  parseUsgsVolcanoAlerts,
+  parseUsgsVolcanoCoordinates,
+  parseUsgsVolcanoEvents,
+  usgsVolcanoUrl,
+  usgsVolcanoesSource,
+} from "./sources/usgsvolcanoes.js";
+export type { UsgsVolcanoAlert, UsgsVolcanoCoordinate } from "./sources/usgsvolcanoes.js";
+export {
+  NOAA_TSUNAMI_ATOM_URLS,
+  NOAA_TSUNAMI_PAAQ_ATOM_URL,
+  NOAA_TSUNAMI_PHEB_ATOM_URL,
+  fetchNoaaTsunamiEvents,
+  noaaTsunamiSource,
+  parseNoaaTsunamiAtom,
+  parseNoaaTsunamiEvents,
+} from "./sources/noaatsunami.js";
+export {
+  GLOFAS_BASINS,
+  GLOFAS_FLOOD_API_URL,
+  GLOFAS_FORECAST_DAYS,
+  GLOFAS_PAST_DAYS,
+  GLOFAS_XNEWS_EXTREME_RATIO,
+  GLOFAS_XNEWS_MODERATE_RATIO,
+  GLOFAS_XNEWS_SEVERE_RATIO,
+  fetchGlofasFloodEvents,
+  glofasBasinSlug,
+  glofasFloodSource,
+  glofasFloodUrl,
+  glofasSeverityForRatio,
+  parseGlofasFloodEvents,
+} from "./sources/glofasflood.js";
+export type { GlofasBasin, GlofasFloodOptions } from "./sources/glofasflood.js";
