@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-25
+
 ### Breaking
 
 - `sec.gov` requests now fail closed with a `config` error unless `secUserAgent` or `userAgent` is set. SEC's fair-access policy requires a declared contact; the old `contact@example.com` default impersonated one.
@@ -126,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Published bundle now links its source map. `--sourcemap=external` emitted `dist/index.js.map` without a `sourceMappingURL` comment, shipping ~308 KB of unreachable data.
 - Declaration maps no longer point at `../src`, which is not part of the published tarball; `declarationMap` is disabled for the build config.
 
-[Unreleased]: https://github.com/xbbg-org/xnews/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/xbbg-org/xnews/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/xbbg-org/xnews/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/xbbg-org/xnews/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/xbbg-org/xnews/releases/tag/v0.1.0
