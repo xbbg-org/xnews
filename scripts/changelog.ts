@@ -29,6 +29,8 @@ export interface PromoteOptions {
   readonly date: string;
   readonly previousVersion: string;
   readonly repositoryUrl: string;
+  /** Prefix prepended to versions in compare links. Defaults to the core package's `v`. */
+  readonly tagPrefix?: string;
 }
 
 function trimBlankEdges(lines: readonly string[]): string[] {
@@ -85,7 +87,7 @@ export function releaseNotes(text: string, version: string): string | undefined 
  * mistake, not something to paper over.
  */
 export function promoteUnreleased(text: string, options: PromoteOptions): string {
-  const { version, date, previousVersion, repositoryUrl } = options;
+  const { version, date, previousVersion, repositoryUrl, tagPrefix = "v" } = options;
   const { lines, sections } = parseChangelog(text);
 
   const unreleased = sections.find((section) => section.label === "Unreleased");
@@ -111,21 +113,23 @@ export function promoteUnreleased(text: string, options: PromoteOptions): string
   promoted.splice(
     linkIndex,
     1,
-    `[Unreleased]: ${repositoryUrl}/compare/v${version}...HEAD`,
-    `[${version}]: ${repositoryUrl}/compare/v${previousVersion}...v${version}`,
+    `[Unreleased]: ${repositoryUrl}/compare/${tagPrefix}${version}...HEAD`,
+    `[${version}]: ${repositoryUrl}/compare/${tagPrefix}${previousVersion}...${tagPrefix}${version}`,
   );
 
   return promoted.join("\n");
 }
 
 async function main(argv: readonly string[]): Promise<number> {
-  const [command, version] = argv;
-  if (command !== "section" || !version) {
-    process.stderr.write("usage: changelog.ts section <version>\n");
+  const [command, pathOrVersion, explicitVersion] = argv;
+  const changelogPath = explicitVersion === undefined ? CHANGELOG_PATH : pathOrVersion;
+  const version = explicitVersion ?? pathOrVersion;
+  if (command !== "section" || !changelogPath || !version) {
+    process.stderr.write("usage: changelog.ts section [changelog-path] <version>\n");
     return 2;
   }
 
-  const notes = releaseNotes(await readFile(CHANGELOG_PATH, "utf8"), version);
+  const notes = releaseNotes(await readFile(changelogPath, "utf8"), version);
   if (!notes) {
     process.stderr.write(`no changelog entries found for ${version}\n`);
     return 1;

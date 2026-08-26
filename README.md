@@ -1091,6 +1091,26 @@ All providers are public web feeds and endpoints whose terms, availability, mark
 
 Inspect `ProviderResult.status`, `warnings`, `requestUrls`, `fetchedAt`, `durationMs`, and `partial` before trusting a feed as complete. A successful package call can still be partial when one provider fails or is unsupported.
 
+## Workspace and releases
+
+This repository is a Bun workspace: the dependency-free `@xbbg/xnews` core stays at
+the root and `@xbbg/xnews-langgraph` lives under `packages/xnews-langgraph`. Run
+`bun run quality` for both packages, or `bun run quality:core` /
+`bun run quality:langgraph` for one package. Packaged consumer checks are similarly
+available as `smoke:packaged-install:core` and
+`smoke:packaged-install:langgraph`.
+
+Releases are independently versioned and must name the package:
+
+```sh
+bun run release core patch
+bun run release langgraph patch
+```
+
+Core releases retain `vX.Y.Z` tags; companion releases use
+`xnews-langgraph-vX.Y.Z`. npm publication is never run locally: both routes publish
+only through the repository's **Publish npm Package** GitHub Actions workflow.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the quality gate, and the

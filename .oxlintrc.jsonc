@@ -11,7 +11,7 @@
     "typeAware": true,
     "typeCheck": true,
   },
-  "ignorePatterns": ["dist/**", "node_modules/**"],
+  "ignorePatterns": ["dist/**", "packages/*/dist/**", "node_modules/**"],
   "rules": {
     // This package intentionally exposes named public APIs.
     "import/no-named-export": "off",

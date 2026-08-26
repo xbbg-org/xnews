@@ -16,6 +16,13 @@
       "groupName": "js tooling"
     },
     {
+      "description": "Keep the companion's LangChain, LangGraph, and Zod compatibility set together.",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["packages/xnews-langgraph/package.json"],
+      "matchPackageNames": ["@langchain/**", "langchain", "zod"],
+      "groupName": "langgraph compatibility"
+    },
+    {
       "description": "Group GitHub Actions updates into a single PR.",
       "matchManagers": ["github-actions"],
       "groupName": "github actions"

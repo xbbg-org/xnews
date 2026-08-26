@@ -11,26 +11,41 @@ consuming application.
 
 ## Development setup
 
+Install the Bun workspace once from the repository root:
+
 ```sh
 bun install
-bun run check   # typecheck + lint + format:check
-bun test
+bun run check
+bun run test
 ```
 
-## Before opening a pull request
+The unqualified commands cover both the root `@xbbg/xnews` package and the
+`packages/xnews-langgraph` companion. Use the scoped commands while working on one
+package:
 
-Run the full quality suite. It is the same gate CI enforces:
+```sh
+bun run check:core
+bun run check:langgraph       # builds the local core first
+bun run quality:core
+bun run quality:langgraph     # resolves @xbbg/xnews from this checkout
+```
+
+Before opening a pull request, run the full workspace quality suite:
 
 ```sh
 bun run quality
-```
-
-That runs typecheck, lint, format check, tests, build, `publint`, and
-`@arethetypeswrong/cli`. To additionally verify the published artifact end to end:
-
-```sh
 bun run smoke:packaged-install
 ```
+
+The companion packaged-install smoke packs both local packages and runs consumer
+projects with exactly Zod 3.25.76 and 4.2.0. A single compatibility case can be run
+with `bun run --cwd packages/xnews-langgraph smoke:packaged-install -- 3.25.76`
+or `-- 4.2.0`.
+
+The companion's development-only `@xbbg/xnews` edge is `file:../..` because Bun's
+`link:` protocol addresses globally registered package names rather than relative
+folders. Published runtime resolution remains the `@xbbg/xnews` peer dependency; no
+local-path specifier is allowed in runtime dependencies.
 
 ## Adding a source
 
@@ -56,34 +71,51 @@ manual check, not part of CI, because it depends on third-party availability.
 ## Commit and release
 
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
-- Record user-visible changes under `## [Unreleased]` in `CHANGELOG.md`.
-- Publishing goes through npm trusted publishing (OIDC). The workflow holds no npm token
-  and the registry only accepts publishes from `npm-publish.yml` on this repository, so
-  no `NPM_TOKEN` secret should ever be added. Renaming that workflow file breaks the
-  registry's trust configuration, and only fails at publish time.
-- Do not add `sideEffects: false` to `package.json`. `bun build` then tree-shakes pure
-  re-exported declarations such as `FIXED_FEEDS` out of the bundle while leaving them in
-  the export list, so the published tarball fails to link under Node.
-  `bun run smoke:packaged-install` is what catches this.
+- Record core changes under `## [Unreleased]` in `CHANGELOG.md` and companion changes
+  in `packages/xnews-langgraph/CHANGELOG.md`.
+- Never run `npm publish` locally. Every publication, including the first companion
+  publication, runs in `.github/workflows/npm-publish.yml`.
+- Normal publishing uses npm trusted publishing (OIDC). The trusted-publishing path
+  explicitly removes token environment variables, and no long-lived npm token belongs
+  in ordinary release jobs.
+- Do not add `sideEffects: false` to the core manifest. `bun build` can then tree-shake
+  pure re-exported declarations such as `FIXED_FEEDS` out of the bundle while leaving
+  them in the export list. The core packaged-install smoke catches this.
 
-Cutting a release is one command:
+Releases are explicit about which independently versioned package is changing:
 
 ```sh
-bun run release patch            # or minor, major, or an explicit 1.2.3
-bun run release patch --dry-run  # validate and print the notes, change nothing
+bun run release core patch
+bun run release langgraph minor
+bun run release core 1.2.3 --dry-run
+bun run release langgraph 0.2.0 --push
 ```
 
-It refuses to run unless you are on `main`, the tree is clean, and `HEAD` matches
-`origin/main`. It then runs `quality` plus `smoke:packaged-install`, bumps the manifest,
-promotes `[Unreleased]` to a dated section with fresh compare links, commits, and creates
-an annotated tag whose message is the release notes. Add `--push` to push both, or run the
-two commands it prints.
+The release command refuses a dirty tree, a branch other than `main`, a mismatch with
+`origin/main`, or a duplicate package tag. It runs only the selected package's quality
+and packaged-install gates, updates only its manifest and changelog, commits, and creates
+an annotated tag. Core keeps `vX.Y.Z`; the companion uses
+`xnews-langgraph-vX.Y.Z`.
 
-Pushing the `vX.Y.Z` tag is what triggers `npm-publish.yml`: it re-runs the gates, refuses
-to publish if `package.json` disagrees with the tag, publishes to npm over OIDC, and cuts
-the GitHub release from the matching `CHANGELOG.md` section. The tag is created locally
-rather than by CI because a tag pushed with `GITHUB_TOKEN` does not trigger workflows, so a
-bot-driven bump would never publish.
+Pushing either tag triggers `npm-publish.yml`. The workflow resolves package metadata
+from an allowlist, requires the selected manifest name and version to match the tag,
+publishes from that package directory, and creates release notes from that package's
+changelog. Retries are idempotent.
+
+The prepared `0.1.0` companion is the one exception to the bump command above. Its first
+publication is still workflow-only. Before dispatching it, protect the `npm-publish`
+GitHub environment with required reviewers and store `NPM_BOOTSTRAP_TOKEN` as an
+environment secret. The token must be short-lived, granular, limited to the `@xbbg`
+scope and package publication, and must not grant account-management permissions.
+
+Dispatch **Publish npm Package** from the current `main` branch for `langgraph` version
+`0.1.0` with `bootstrap` enabled. The workflow verifies and packs without release
+credentials, publishes the immutable tarball in the protected environment, confirms the
+npm version, and only then creates `xnews-langgraph-v0.1.0`. Delete the bootstrap secret
+immediately after success, then configure npm trusted publishing for the exact
+`npm-publish.yml` workflow. Bootstrap fails closed for registry errors and is rejected
+for core, tag-push events, non-`main` commits, existing tags, or an existing package. All
+subsequent companion releases use the release CLI and OIDC.
 
 ## License
 

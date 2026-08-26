@@ -105,6 +105,23 @@ test("reports no notes for a version that is absent", () => {
   expect(releaseNotes(CHANGELOG, "9.9.9")).toBeUndefined();
 });
 
+test("uses a package-specific tag prefix in companion compare links", () => {
+  const promoted = promoteUnreleased(CHANGELOG, {
+    version: "0.3.0",
+    date: "2026-03-04",
+    previousVersion: "0.2.0",
+    repositoryUrl: REPOSITORY_URL,
+    tagPrefix: "xnews-langgraph-v",
+  });
+
+  expect(promoted).toContain(
+    `[Unreleased]: ${REPOSITORY_URL}/compare/xnews-langgraph-v0.3.0...HEAD`,
+  );
+  expect(promoted).toContain(
+    `[0.3.0]: ${REPOSITORY_URL}/compare/xnews-langgraph-v0.2.0...xnews-langgraph-v0.3.0`,
+  );
+});
+
 test("parses the real CHANGELOG.md without leaking link references into any section", async () => {
   const text = await readFile(CHANGELOG_PATH, "utf8");
   const { sections } = parseChangelog(text);

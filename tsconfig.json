@@ -28,7 +28,7 @@
     "outDir": "dist",
     "rootDir": ".",
     "skipLibCheck": false,
-    "types": ["bun-types"],
+    "types": ["bun"],
     "lib": ["ES2024", "DOM"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "examples/**/*.ts"]

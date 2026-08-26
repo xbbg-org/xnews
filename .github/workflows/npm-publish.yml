@@ -2,162 +2,475 @@ name: Publish npm Package
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "xnews-langgraph-v*"]
   workflow_dispatch:
     inputs:
+      package:
+        description: "Allowlisted package to publish from its existing remote release tag."
+        required: true
+        type: choice
+        options:
+          - core
+          - langgraph
       version:
-        description: "Stable npm version/tag to publish from the current workflow commit (e.g. v1.2.3). Required for manual retries."
+        description: "Stable version without a tag prefix (for example, 1.2.3)."
         required: true
         type: string
+      bootstrap:
+        description: "Use the one-time token path for the first @xbbg/xnews-langgraph publication."
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
+concurrency:
+  group: npm-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release-version:
-    name: Resolve npm release version
+  release-metadata:
+    name: Resolve allowlisted release metadata
     runs-on: ubuntu-latest
     outputs:
-      should_publish: ${{ steps.version.outputs.should_publish }}
-      version: ${{ steps.version.outputs.version }}
+      bootstrap: ${{ steps.release.outputs.bootstrap }}
+      changelog: ${{ steps.release.outputs.changelog }}
+      directory: ${{ steps.release.outputs.directory }}
+      manifest: ${{ steps.release.outputs.manifest }}
+      package_id: ${{ steps.release.outputs.package_id }}
+      package_name: ${{ steps.release.outputs.package_name }}
+      quality_command: ${{ steps.release.outputs.quality_command }}
+      release_title: ${{ steps.release.outputs.release_title }}
+      smoke_command: ${{ steps.release.outputs.smoke_command }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
     steps:
-      - name: Resolve and validate version
-        id: version
+      - name: Resolve tag and package metadata
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_BOOTSTRAP: ${{ inputs.bootstrap }}
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            RAW_VERSION="${{ inputs.version }}"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            PACKAGE_ID="$INPUT_PACKAGE"
+            VERSION="$INPUT_VERSION"
+            BOOTSTRAP="$INPUT_BOOTSTRAP"
           else
-            RAW_VERSION="${GITHUB_REF_NAME}"
+            BOOTSTRAP="false"
+            case "$REF_NAME" in
+              xnews-langgraph-v*)
+                PACKAGE_ID="langgraph"
+                VERSION="${REF_NAME#xnews-langgraph-v}"
+                ;;
+              v*)
+                PACKAGE_ID="core"
+                VERSION="${REF_NAME#v}"
+                ;;
+              *)
+                echo "::error::tag '$REF_NAME' does not select an allowlisted npm package"
+                exit 1
+                ;;
+            esac
           fi
 
-          if [[ ! "$RAW_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "::error::npm publishes require a stable semver tag/version like v1.2.3; got '$RAW_VERSION'"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::npm publishes require stable semver; got '$VERSION'"
+            exit 1
+          fi
+
+          case "$PACKAGE_ID" in
+            core)
+              DIRECTORY="."
+              MANIFEST="package.json"
+              CHANGELOG="CHANGELOG.md"
+              PACKAGE_NAME="@xbbg/xnews"
+              QUALITY_COMMAND="quality:core"
+              SMOKE_COMMAND="smoke:packaged-install:core"
+              TAG_PREFIX="v"
+              ;;
+            langgraph)
+              DIRECTORY="packages/xnews-langgraph"
+              MANIFEST="packages/xnews-langgraph/package.json"
+              CHANGELOG="packages/xnews-langgraph/CHANGELOG.md"
+              PACKAGE_NAME="@xbbg/xnews-langgraph"
+              QUALITY_COMMAND="quality:langgraph"
+              SMOKE_COMMAND="smoke:packaged-install:langgraph"
+              TAG_PREFIX="xnews-langgraph-v"
+              ;;
+            *)
+              echo "::error::unknown package '$PACKAGE_ID'; expected core or langgraph"
+              exit 1
+              ;;
+          esac
+
+          TAG="${TAG_PREFIX}${VERSION}"
+          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$REF_NAME" != "$TAG" ]]; then
+            echo "::error::tag '$REF_NAME' does not exactly match resolved tag '$TAG'"
+            exit 1
+          fi
+
+          if [[ "$BOOTSTRAP" == "true" ]]; then
+            if [[ "$EVENT_NAME" != "workflow_dispatch" || "$PACKAGE_ID" != "langgraph" ]]; then
+              echo "::error::bootstrap is workflow_dispatch-only and restricted to langgraph"
               exit 1
             fi
-            echo "::notice::Skipping npm publish for non-stable tag '$RAW_VERSION'"
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          elif [[ "$BOOTSTRAP" != "false" ]]; then
+            echo "::error::invalid bootstrap value '$BOOTSTRAP'"
+            exit 1
           fi
 
-          echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
-          echo "Publishing npm package for ${RAW_VERSION}"
+          if [[ "$PACKAGE_ID" == "core" ]]; then
+            RELEASE_TITLE="$TAG"
+          else
+            RELEASE_TITLE="xnews LangGraph ${VERSION}"
+          fi
 
-  publish:
-    name: Publish @xbbg/xnews
-    needs: release-version
-    if: needs.release-version.outputs.should_publish == 'true'
+          {
+            echo "bootstrap=$BOOTSTRAP"
+            echo "changelog=$CHANGELOG"
+            echo "directory=$DIRECTORY"
+            echo "manifest=$MANIFEST"
+            echo "package_id=$PACKAGE_ID"
+            echo "package_name=$PACKAGE_NAME"
+            echo "quality_command=$QUALITY_COMMAND"
+            echo "release_title=$RELEASE_TITLE"
+            echo "smoke_command=$SMOKE_COMMAND"
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify and pack ${{ needs.release-metadata.outputs.package_name }}
+    needs: release-metadata
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      already_exists: ${{ steps.registry.outputs.already_exists }}
+      package_sha256: ${{ steps.pack.outputs.package_sha256 }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - name: Check out repository without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify release commit and tag state
+        env:
+          BOOTSTRAP: ${{ needs.release-metadata.outputs.bootstrap }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+
+          if [[ "$BOOTSTRAP" == "true" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "::error::bootstrap must be dispatched from the main branch"
+              exit 1
+            fi
+            git fetch --no-tags origin refs/heads/main
+            MAIN_COMMIT="$(git rev-parse FETCH_HEAD)"
+            if [[ "$HEAD_COMMIT" != "$MAIN_COMMIT" ]]; then
+              echo "::error::bootstrap commit $HEAD_COMMIT is not current origin/main $MAIN_COMMIT"
+              exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "::error::bootstrap tag $RELEASE_TAG already exists; use the normal tagged release path"
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "::error::remote tag $RELEASE_TAG does not exist"
+            exit 1
+          fi
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          TAG_COMMIT="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+            echo "::error::remote tag $RELEASE_TAG points to $TAG_COMMIT, not workflow commit $HEAD_COMMIT"
+            exit 1
+          fi
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.14
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          # npm's release guidance: never restore a cache into a publish build.
           package-manager-cache: false
 
-      - name: Ensure npm trusted publishing support
-        run: |
-          npm install -g npm@^11.10.0
-          node --version
-          npm --version
+      - name: Install exact reviewed npm CLI
+        run: npm install -g npm@11.10.0 --ignore-scripts
 
-      - name: Install dependencies
+      - name: Install workspace dependencies
         run: bun install --frozen-lockfile
 
-      # The tag is the source of truth. A tag that disagrees with the committed
-      # manifest would publish a version nobody can reproduce from this ref.
-      - name: Verify manifest version matches tag
+      - name: Verify manifest identity and version
+        env:
+          EXPECTED_NAME: ${{ needs.release-metadata.outputs.package_name }}
+          EXPECTED_VERSION: ${{ needs.release-metadata.outputs.version }}
+          MANIFEST_PATH: ${{ needs.release-metadata.outputs.manifest }}
         shell: bash
         run: |
           set -euo pipefail
-          MANIFEST_VERSION="$(node -p "require('./package.json').version")"
-          EXPECTED="${{ needs.release-version.outputs.version }}"
-          if [[ "$MANIFEST_VERSION" != "$EXPECTED" ]]; then
-            echo "::error::package.json version ($MANIFEST_VERSION) does not match release tag ($EXPECTED)"
+          node --input-type=module - <<'NODE'
+          import { readFileSync } from "node:fs";
+          const manifest = JSON.parse(readFileSync(process.env.MANIFEST_PATH, "utf8"));
+          if (manifest.name !== process.env.EXPECTED_NAME) {
+            throw new Error(`${process.env.MANIFEST_PATH} names ${manifest.name}, expected ${process.env.EXPECTED_NAME}`);
+          }
+          if (manifest.version !== process.env.EXPECTED_VERSION) {
+            throw new Error(`${process.env.MANIFEST_PATH} version ${manifest.version} does not match tag version ${process.env.EXPECTED_VERSION}`);
+          }
+          NODE
+
+      - name: Run selected package quality suite
+        env:
+          QUALITY_COMMAND: ${{ needs.release-metadata.outputs.quality_command }}
+        run: bun run "$QUALITY_COMMAND"
+
+      - name: Smoke test selected packaged install
+        env:
+          SMOKE_COMMAND: ${{ needs.release-metadata.outputs.smoke_command }}
+        run: bun run "$SMOKE_COMMAND"
+
+      - name: Check registry idempotency and bootstrap eligibility
+        id: registry
+        env:
+          BOOTSTRAP: ${{ needs.release-metadata.outputs.bootstrap }}
+          PACKAGE_NAME: ${{ needs.release-metadata.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.release-metadata.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import { appendFileSync } from "node:fs";
+          import { spawnSync } from "node:child_process";
+
+          function isExplicitNotFound(value) {
+            try {
+              const parsed = JSON.parse(value.trim());
+              return parsed !== null && typeof parsed === "object" &&
+                parsed.error !== null && typeof parsed.error === "object" &&
+                parsed.error.code === "E404";
+            } catch {
+              return false;
+            }
+          }
+
+          function npmPackageExists(specifier) {
+            const result = spawnSync(
+              "npm",
+              ["view", specifier, "version", "--json", "--registry", "https://registry.npmjs.org", "--loglevel", "silent"],
+              { encoding: "utf8", timeout: 30_000 },
+            );
+            if (result.status === 0) return true;
+            const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+            if (
+              result.status !== null &&
+              [result.stdout ?? "", result.stderr ?? ""].some(isExplicitNotFound)
+            ) return false;
+            console.error(diagnostic);
+            throw new Error(`npm registry lookup failed closed for ${specifier} (status ${String(result.status)}, signal ${String(result.signal)})`);
+          }
+
+          const packageName = process.env.PACKAGE_NAME;
+          const packageVersion = process.env.PACKAGE_VERSION;
+          const bootstrap = process.env.BOOTSTRAP === "true";
+          const versionExists = npmPackageExists(`${packageName}@${packageVersion}`);
+
+          if (bootstrap) {
+            if (npmPackageExists(packageName)) {
+              throw new Error("bootstrap is only allowed before the package's first npm publication");
+            }
+            if (versionExists) {
+              throw new Error("bootstrap version unexpectedly exists while the package lookup reports absence");
+            }
+          }
+
+          if (versionExists) {
+            console.log(`${packageName}@${packageVersion} already exists on npm; publication is idempotently complete`);
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `already_exists=${String(versionExists)}\n`);
+          NODE
+
+      - name: Pack the verified package without release credentials
+        id: pack
+        env:
+          CHANGELOG_PATH: ${{ needs.release-metadata.outputs.changelog }}
+          PACKAGE_DIRECTORY: ${{ needs.release-metadata.outputs.directory }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIRECTORY="${RUNNER_TEMP}/npm-release"
+          mkdir -p "$RELEASE_DIRECTORY"
+          PACK_JSON="$(npm pack "$PACKAGE_DIRECTORY" --json --pack-destination "$RELEASE_DIRECTORY")"
+          PACKED_FILENAME="$(PACK_JSON="$PACK_JSON" node --input-type=module -e 'const rows = JSON.parse(process.env.PACK_JSON); if (rows.length !== 1 || typeof rows[0].filename !== "string") throw new Error("npm pack did not return one tarball"); process.stdout.write(rows[0].filename)')"
+          mv "${RELEASE_DIRECTORY}/${PACKED_FILENAME}" "${RELEASE_DIRECTORY}/package.tgz"
+          PACKAGE_SHA256="$(sha256sum "${RELEASE_DIRECTORY}/package.tgz" | cut -d ' ' -f 1)"
+          printf '%s  package.tgz\n' "$PACKAGE_SHA256" > "${RELEASE_DIRECTORY}/SHA256SUMS"
+          bun run ./scripts/changelog.ts section "$CHANGELOG_PATH" "$VERSION" > "${RELEASE_DIRECTORY}/notes.md"
+          echo "package_sha256=$PACKAGE_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-release-${{ needs.release-metadata.outputs.package_id }}-${{ needs.release-metadata.outputs.version }}
+          path: ${{ runner.temp }}/npm-release
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish verified ${{ needs.release-metadata.outputs.package_name }} tarball
+    needs: [release-metadata, verify]
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Publication already complete
+        if: needs.verify.outputs.already_exists == 'true'
+        run: echo "Registry version already exists; no npm credential will be used"
+
+      - name: Download verified release inputs
+        if: needs.verify.outputs.already_exists != 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-release-${{ needs.release-metadata.outputs.package_id }}-${{ needs.release-metadata.outputs.version }}
+          path: npm-release
+
+      - name: Set up Node.js
+        if: needs.verify.outputs.already_exists != 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install exact reviewed npm CLI
+        if: needs.verify.outputs.already_exists != 'true'
+        run: npm install -g npm@11.10.0 --ignore-scripts
+
+      - name: Verify release tarball integrity
+        if: needs.verify.outputs.already_exists != 'true'
+        env:
+          EXPECTED_SHA256: ${{ needs.verify.outputs.package_sha256 }}
+        working-directory: npm-release
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA256="$(sha256sum package.tgz | cut -d ' ' -f 1)"
+          if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::release tarball hash mismatch"
             exit 1
           fi
-          echo "Manifest and tag agree on ${EXPECTED}"
-
-      - name: Run quality suite
-        run: bun run quality
-
-      - name: Smoke test packaged install
-        run: bun run smoke:packaged-install
+          sha256sum --check SHA256SUMS
 
       - name: Publish with trusted publishing
+        if: needs.verify.outputs.already_exists != 'true' && needs.release-metadata.outputs.bootstrap != 'true'
+        working-directory: npm-release
         shell: bash
         run: |
           set -euo pipefail
-
           unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_USERCONFIG
+          npm publish package.tgz --ignore-scripts --provenance --access public --registry https://registry.npmjs.org
 
-          PACKAGE_NAME="$(node -p "require('./package.json').name")"
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry https://registry.npmjs.org --loglevel=silent >/dev/null 2>&1; then
-            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping"
-            exit 0
+      - name: Bootstrap first companion publication
+        if: needs.verify.outputs.already_exists != 'true' && needs.release-metadata.outputs.bootstrap == 'true'
+        working-directory: npm-release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$NODE_AUTH_TOKEN" ]]; then
+            echo "::error::NPM_BOOTSTRAP_TOKEN is required for the first companion publication"
+            exit 1
           fi
+          npm publish package.tgz --ignore-scripts --access public --registry https://registry.npmjs.org
 
-          echo "Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION}"
-          npm publish --provenance --access public --registry https://registry.npmjs.org
-
-  github-release:
-    name: Publish GitHub release
-    needs: [release-version, publish]
-    if: needs.release-version.outputs.should_publish == 'true'
+  tag:
+    name: Verify or create release tag
+    needs: [release-metadata, verify, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Check out the verified commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          bun-version: 1.3.14
+          ref: ${{ github.sha }}
+          fetch-depth: 1
 
-      # CHANGELOG.md is the single source of release notes, so the GitHub release
-      # cannot drift from what the tag and the npm tarball claim to contain.
-      - name: Create release from changelog
+      - name: Verify publication and release tag
         env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.release-version.outputs.version }}
+          BOOTSTRAP: ${{ needs.release-metadata.outputs.bootstrap }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+          RELEASE_TITLE: ${{ needs.release-metadata.outputs.release_title }}
         shell: bash
         run: |
           set -euo pipefail
+          HEAD_COMMIT="$(git rev-parse HEAD)"
 
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            echo "GitHub release v${VERSION} already exists; skipping"
+          if [[ "$BOOTSTRAP" == "true" ]]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "::error::bootstrap tag $RELEASE_TAG appeared concurrently; refusing to overwrite it"
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" -m "$RELEASE_TITLE"
+            git push origin "refs/tags/${RELEASE_TAG}"
             exit 0
           fi
 
-          # workflow_dispatch retries can run before the tag exists. A release
-          # would then invent a tag on the dispatched ref, so skip instead.
-          if ! git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "::notice::tag v${VERSION} is not on origin; skipping GitHub release"
-            exit 0
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          TAG_COMMIT="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+            echo "::error::remote tag $RELEASE_TAG points to $TAG_COMMIT, not workflow commit $HEAD_COMMIT"
+            exit 1
           fi
 
-          bun run ./scripts/changelog.ts section "${VERSION}" > "${RUNNER_TEMP}/notes.md"
-          gh release create "v${VERSION}" \
+  github-release:
+    name: Publish GitHub release
+    needs: [release-metadata, tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release notes
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-release-${{ needs.release-metadata.outputs.package_id }}-${{ needs.release-metadata.outputs.version }}
+          path: npm-release
+
+      - name: Create GitHub release from verified notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+          RELEASE_TITLE: ${{ needs.release-metadata.outputs.release_title }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub release $RELEASE_TAG already exists; skipping"
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" \
             --verify-tag \
-            --title "v${VERSION}" \
-            --notes-file "${RUNNER_TEMP}/notes.md"
+            --title "$RELEASE_TITLE" \
+            --notes-file npm-release/notes.md

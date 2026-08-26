@@ -1,0 +1,85 @@
+{
+  "name": "@xbbg/xnews-langgraph",
+  "version": "0.1.0",
+  "description": "Provider-agnostic LangChain and LangGraph tools, finite nodes, and an analyst for @xbbg/xnews.",
+  "keywords": [
+    "agent",
+    "langchain",
+    "langgraph",
+    "news",
+    "research",
+    "typescript",
+    "xnews"
+  ],
+  "homepage": "https://github.com/xbbg-org/xnews/tree/main/packages/xnews-langgraph#readme",
+  "bugs": {
+    "url": "https://github.com/xbbg-org/xnews/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "Alpha x1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xbbg-org/xnews.git",
+    "directory": "packages/xnews-langgraph"
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint -c ../../.oxlintrc.jsonc --tsconfig tsconfig.json src test scripts",
+    "format": "oxfmt --config ../../.oxfmtrc.json --write .",
+    "format:check": "oxfmt --config ../../.oxfmtrc.json --check .",
+    "check": "bun run typecheck && bun run lint && bun run format:check",
+    "test": "bun test ./test",
+    "pack:dry-run": "npm pack --dry-run",
+    "pack:lint": "publint --strict",
+    "types:attw": "attw --pack . --profile node16 --ignore-rules cjs-resolves-to-esm",
+    "quality": "bun run check && bun test ./test && bun run build && bun run pack:lint && bun run types:attw",
+    "smoke:packaged-install": "bun run ./scripts/smoke-packaged-install.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@langchain/core": "^1.2.9",
+    "@langchain/langgraph": "^1.4.12",
+    "@types/bun": "^1.3.14",
+    "@xbbg/xnews": "file:../..",
+    "langchain": "^1.5.10",
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.72.0",
+    "oxlint-tsgolint": "^0.24.0",
+    "publint": "^0.3.21",
+    "typescript": "^5.9.0",
+    "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@langchain/core": "^1.2.9",
+    "@langchain/langgraph": "^1.4.12",
+    "@xbbg/xnews": "^0.2.0",
+    "langchain": "^1.5.10",
+    "zod": "^3.25.76 || ^4.2.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "bun@1.3.14"
+}
