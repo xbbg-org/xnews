@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { ToolMessage } from "@langchain/core/messages";
-import type { DataSource } from "@xbbg/xnews";
+import type {
+  DataSource,
+  RealtimeAsrBackend,
+  RealtimeAsrEvent,
+  RealtimeAsrSession,
+} from "@xbbg/xnews";
 import { z } from "zod";
 
 import { createXnewsTools } from "../src/index.js";
@@ -185,6 +190,17 @@ test("files seam rejects model-supplied records and direct URLs before transport
       runtime,
     ),
   );
+  await expectRejection(
+    tool.invoke(
+      {
+        type: "tool_call",
+        id: "files-work",
+        name: "xnews_files",
+        args: { operation: "download_work", record: "host-record" },
+      },
+      runtime,
+    ),
+  );
 
   expect(calls).toBe(0);
 });
@@ -219,6 +235,45 @@ test("files seam resolves only host-bound work-file keys", async () => {
 
   expect(requested).toEqual(["https://files.test/report.txt"]);
   expect(ToolMessage.isInstance(result)).toBe(true);
+});
+test("realtime transcription tool ends a provider stall at the runtime deadline", async () => {
+  const stalledSession: RealtimeAsrSession = {
+    backend: "stalled-asr",
+    write: async () => {},
+    markGap: async () => {},
+    close: async () => {},
+    abort: async () => {},
+    [Symbol.asyncIterator](): AsyncIterator<RealtimeAsrEvent> {
+      const { promise } = Promise.withResolvers<IteratorResult<RealtimeAsrEvent>>();
+      return { next: () => promise };
+    },
+  };
+  const backend: RealtimeAsrBackend = {
+    id: "stalled-asr",
+    open: async () => stalledSession,
+  };
+  const result = await toolNamed("xnews_transcribe").invoke(
+    {
+      type: "tool_call",
+      id: "transcribe-stall",
+      name: "xnews_transcribe",
+      args: { operation: "pcm", backend: "stalled", artifacts: ["chunk"] },
+    },
+    {
+      context: {
+        timeoutMs: 10,
+        binaryArtifacts: { chunk: new Uint8Array([1, 2]) },
+        realtimeAsrBackends: { stalled: backend },
+      },
+    },
+  );
+
+  expect(ToolMessage.isInstance(result)).toBe(true);
+  if (!ToolMessage.isInstance(result)) throw new Error("Expected ToolMessage");
+  const content: unknown = result.content;
+  if (typeof content !== "string" && !Array.isArray(content))
+    throw new Error("Expected string or array ToolMessage content");
+  expect(typeof content === "string" ? content : JSON.stringify(content)).toContain("error");
 });
 
 test("invalid runtime context rejects without echoing operator values", async () => {

@@ -4,7 +4,6 @@ import {
   buildTopicNewsFeedResult,
   buildWatchlistNewsFeedResult,
   downloadFile,
-  downloadWork,
   extractDjvuText,
   extractPdfImages,
   extractPdfText,
@@ -31,7 +30,6 @@ import {
   type NewsFeedOptions,
   type NewsProvider,
   type OcrOptions,
-  type RealtimeAsrEvent,
   type WorkFile,
   type WorkRecord,
   type WorksQuery,
@@ -41,6 +39,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { tool, type ToolRuntime } from "langchain";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 
+import { collectBoundedAsync, finiteStepSignal } from "../bounded-async.js";
 import {
   requireRuntimeContext,
   sourceFetchOptions,
@@ -406,10 +405,7 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
             options,
           });
         }
-        const result =
-          input.operation === "download_work"
-            ? await downloadWork(requireWorkRecord(context, input.record), fileOptions)
-            : await downloadFile(requireWorkFile(context, input.file), fileOptions);
+        const result = await downloadFile(requireWorkFile(context, input.file), fileOptions);
         return createXnewsToolOutput({
           tool: "xnews_files",
           operation: input.operation,
@@ -552,19 +548,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
           throw new Error(`No realtime ASR backend is bound as ${input.backend}`);
         const artifactKeys = unique(input.artifacts);
         const chunks = artifactKeys.map((artifact) => requireBinaryArtifact(context, artifact));
-        const source = finiteChunks(chunks);
-        const result: RealtimeAsrEvent[] = [];
-        let truncated = false;
-        for await (const event of transcribePcmStream(source, {
-          backend,
-          ...(context.signal === undefined ? {} : { signal: context.signal }),
-        })) {
-          result.push(event);
-          if (result.length >= MAX_FINITE_ASR_EVENTS) {
-            truncated = true;
-            break;
-          }
-        }
+        const signal = finiteStepSignal(context.signal, context.timeoutMs);
+        const collected = await collectBoundedAsync(
+          transcribePcmStream(finiteChunks(chunks), { backend, signal }),
+          MAX_FINITE_ASR_EVENTS,
+          signal,
+        );
+        const result = collected.items;
+        const truncated = collected.truncated;
         return createXnewsToolOutput({
           tool: "xnews_transcribe",
           operation: input.operation,

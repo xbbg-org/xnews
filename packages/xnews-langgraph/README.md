@@ -31,6 +31,11 @@ console.log(tools.map((tool) => tool.name));
 The seams are `xnews_news`, `xnews_research`, `xnews_data`, `xnews_events`, `xnews_works`, `xnews_files`, `xnews_extract`, `xnews_ocr`, `xnews_transcribe`, and `xnews_catalog`. Each uses an operation discriminator. Data, event, works, binary, OCR, and ASR resources are selected by opaque keys bound by the host in runtime context; provider-specific credentials and transport settings are never model arguments.
 
 `xnews_files` accepts only host-bound `workRecords` and `workFiles` keys. It never accepts a model-supplied work record or download URL, so host credentials cannot be attached to a model-selected origin and model calls cannot become an arbitrary network fetch.
+`resolve` returns provider candidates for host review; it does not authorize a download. The host
+must validate a candidate's origin and bind the approved `WorkFile` under `workFiles` before the
+model can call `download_file`. There is no operation that resolves and follows a provider-selected
+URL in one step. YouTube caption discovery likewise follows only HTTPS caption URLs on
+YouTube/Google-owned caption origins.
 
 ```ts
 import { cotDataSource } from "@xbbg/xnews";
@@ -125,6 +130,11 @@ Infinite async generators are not tools. These factories perform exactly one pol
 Add the returned async function as a node in your own `StateGraph`, define the matching state channels with current `StateSchema` APIs, and compile with your chosen checkpointer. A checkpoint is committed after a successful node step; rerunning the committed state does not replay consumed ids, dates, sequences, or chunks.
 
 Realtime ASR opens a new backend session for each non-empty invocation. Backend objects, sessions, streams, and sockets are invocation-local and never enter returned state. A process restart cannot resume a live ASR session: uncommitted queued chunks start a new session and replay, while checkpointed consumed chunks do not.
+ASR collection has both retention and work bounds. `maxEvents` controls returned checkpoint
+history, while `maxEventsPerStep` defaults to 4,000 and is hard-capped at 10,000. PCM tool and node
+iterations use `context.timeoutMs` as an invocation deadline (30 seconds by default, capped at two
+minutes), race providers that ignore abort signals, and do not commit queued chunks when a node
+hits its event or time limit.
 
 ## Host responsibilities
 

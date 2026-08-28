@@ -15,18 +15,21 @@ import {
   type RealtimeAsrEvent,
 } from "@xbbg/xnews";
 
+import { collectBoundedAsync, finiteStepSignal } from "../bounded-async.js";
 import {
   requireRuntimeContext,
   runtimeSecretValues,
   sourceFetchOptions,
   type XnewsRuntimeContext,
 } from "../context.js";
-import { redactText } from "../digest.js";
+import { isSensitiveDataKey, redactText } from "../digest.js";
 import { isRecord } from "../type-guards.js";
 
 const DEFAULT_MAX_SEEN_IDS = 10_000;
 const DEFAULT_MAX_ASR_EVENTS = 1_000;
 const DEFAULT_MAX_ASR_CHUNKS_PER_STEP = 32;
+const DEFAULT_MAX_ASR_EVENTS_PER_STEP = 4_000;
+const MAX_ASR_EVENTS_PER_STEP = 10_000;
 
 export interface XnewsNodeRuntime {
   readonly context?: XnewsRuntimeContext | undefined;
@@ -241,6 +244,7 @@ export interface XnewsRealtimeAsrChunk {
 export interface XnewsRealtimeAsrNodeOptions {
   readonly backend: string;
   readonly maxEvents?: number | undefined;
+  readonly maxEventsPerStep?: number | undefined;
   readonly maxConsumedChunkIds?: number | undefined;
   readonly maxChunksPerStep?: number | undefined;
 }
@@ -272,6 +276,10 @@ export function createXnewsRealtimeAsrNode(
   options: XnewsRealtimeAsrNodeOptions,
 ): XnewsNode<XnewsRealtimeAsrNodeState, XnewsRealtimeAsrNodeUpdate> {
   const maxEvents = normalizePositiveInteger(options.maxEvents, DEFAULT_MAX_ASR_EVENTS);
+  const maxEventsPerStep = Math.min(
+    normalizePositiveInteger(options.maxEventsPerStep, DEFAULT_MAX_ASR_EVENTS_PER_STEP),
+    MAX_ASR_EVENTS_PER_STEP,
+  );
   const maxConsumedChunkIds = normalizePositiveInteger(
     options.maxConsumedChunkIds,
     DEFAULT_MAX_SEEN_IDS,
@@ -302,15 +310,16 @@ export function createXnewsRealtimeAsrNode(
     const backend = context.realtimeAsrBackends?.[options.backend];
     if (backend === undefined) throw new Error("Realtime ASR backend is not bound");
     const chunks = queued.map((chunk) => new Uint8Array(Buffer.from(chunk.pcmBase64, "base64")));
-    const emitted: RealtimeAsrEvent[] = [];
+    let emitted: readonly RealtimeAsrEvent[];
     try {
-      for await (const event of transcribePcmStream(finiteChunks(chunks), {
-        backend,
-        ...(context.signal === undefined ? {} : { signal: context.signal }),
-      })) {
-        if (emitted.length === maxEvents) emitted.shift();
-        emitted.push(event);
-      }
+      const signal = finiteStepSignal(context.signal, context.timeoutMs);
+      const collected = await collectBoundedAsync(
+        transcribePcmStream(finiteChunks(chunks), { backend, signal }),
+        maxEventsPerStep,
+        signal,
+      );
+      if (collected.truncated) throw new RangeError("Realtime ASR event limit exceeded");
+      emitted = collected.items;
       throwIfAborted(context);
     } catch (error) {
       throw redactNodeError(error, context);
@@ -373,18 +382,24 @@ async function* finiteChunks(chunks: readonly Uint8Array[]): AsyncGenerator<Uint
 }
 
 function redactNodeData<T extends object>(value: T, context: XnewsRuntimeContext): T {
-  const cloned = structuredClone(value);
-  if (!isRecord(cloned)) throw new Error("Expected cloned node data to be an object");
-  const secrets = runtimeSecretValues(context);
-  for (const [entryKey, entryValue] of Object.entries(cloned)) {
-    const outputKey = redactText(entryKey, secrets);
-    if (outputKey !== entryKey) Reflect.deleteProperty(cloned, entryKey);
-    Reflect.set(cloned, outputKey, redactNodeValue(entryValue, secrets, entryKey));
+  try {
+    const cloned = structuredClone(value);
+    if (!isRecord(cloned)) throw new TypeError("Expected cloned node data to be an object");
+    const secrets = runtimeSecretValues(context);
+    for (const [entryKey, entryValue] of Object.entries(cloned)) {
+      const sensitive = isSensitiveDataKey(entryKey);
+      const outputKey = sensitive ? "[REDACTED]" : redactText(entryKey, secrets);
+      if (outputKey !== entryKey) Reflect.deleteProperty(cloned, entryKey);
+      Reflect.set(cloned, outputKey, redactNodeValue(entryValue, secrets, entryKey));
+    }
+    return cloned;
+  } catch (error) {
+    throw redactNodeError(error, context);
   }
-  return cloned;
 }
 
 function redactNodeValue(value: unknown, secrets: readonly string[], key?: string): unknown {
+  if (key !== undefined && isSensitiveDataKey(key)) return "[REDACTED]";
   if (key === "warnings" && Array.isArray(value)) {
     return value.map(() => "Provider warning");
   }
@@ -405,7 +420,7 @@ function redactNodeValue(value: unknown, secrets: readonly string[], key?: strin
   if (!isRecord(value)) return value;
   const output: Record<string, unknown> = {};
   for (const [entryKey, entryValue] of Object.entries(value)) {
-    const outputKey = redactText(entryKey, secrets);
+    const outputKey = isSensitiveDataKey(entryKey) ? "[REDACTED]" : redactText(entryKey, secrets);
     output[outputKey] = redactNodeValue(entryValue, secrets, entryKey);
   }
   return output;

@@ -60,7 +60,7 @@ test("data watch node resumes by sequence and distinguishes repeated failures", 
         asOf: "2026-08-25",
         sequence,
         url: "https://data.test/sequence",
-        rows: [{ sequence }],
+        rows: [{ sequence, authorization: "issued-data-token" }],
       };
     },
   };
@@ -71,6 +71,7 @@ test("data watch node resumes by sequence and distinguishes repeated failures", 
   expect(first).toMatchObject({ emitted: true, sinceSequence: 7 });
   expect(resumed).toMatchObject({ emitted: true, sinceSequence: 8 });
   expect(afterSequences).toEqual([undefined, 7]);
+  expect(JSON.stringify(first)).not.toContain("issued-data-token");
 
   const failing: DataSource<unknown> = {
     provider: "fixture",
@@ -114,6 +115,7 @@ test("event watch node keeps the full snapshot authoritative and checkpoints del
                 category: "weather" as const,
                 title: "New event",
                 severity: "severe" as const,
+                cookie: "issued-event-cookie",
               },
             ]
           : []),
@@ -139,6 +141,7 @@ test("event watch node keeps the full snapshot authoritative and checkpoints del
     "gdelt-1234567891",
   ]);
   expect(resumed.seenIds).toEqual(["gdelt-1234567890", "gdelt-1234567891"]);
+  expect(JSON.stringify(resumed)).not.toContain("issued-event-cookie");
 });
 
 class FakeAsrSession implements RealtimeAsrSession {
@@ -150,7 +153,8 @@ class FakeAsrSession implements RealtimeAsrSession {
       backend: "fake-asr",
       sequence: 1,
       generation: 1,
-    },
+      authorization: "issued-asr-token",
+    } as RealtimeAsrEvent,
   ];
   #waiter: (() => void) | undefined;
   #closed = false;
@@ -271,6 +275,7 @@ test("realtime ASR node drains finite chunks and checkpoints no live handles", a
   expect(resumed).toEqual(first);
   expect(() => JSON.stringify(first)).not.toThrow();
   expect(Object.values(first).some((value) => typeof value === "function")).toBe(false);
+  expect(JSON.stringify(first)).not.toContain("issued-asr-token");
 });
 
 test("realtime ASR node preserves the prior sequence when a session emits no events", async () => {
@@ -297,6 +302,109 @@ test("realtime ASR node preserves the prior sequence when a session emits no eve
 
   expect(result.events).toEqual([]);
   expect(result.lastSequence).toBe(41);
+  expect(result.consumedChunkIds).toEqual(["chunk"]);
+});
+test("realtime ASR node fails finite work on event caps and deadlines without consuming chunks", async () => {
+  const endlessSession: RealtimeAsrSession = {
+    backend: "endless-asr",
+    write: async () => {},
+    markGap: async () => {},
+    close: async () => {},
+    abort: async () => {},
+    async *[Symbol.asyncIterator](): AsyncGenerator<RealtimeAsrEvent> {
+      let sequence = 0;
+      while (true) {
+        sequence += 1;
+        yield {
+          type: "status",
+          state: "ready",
+          backend: "endless-asr",
+          sequence,
+          generation: 1,
+        };
+        await Promise.resolve();
+      }
+    },
+  };
+  const stalledSession: RealtimeAsrSession = {
+    backend: "stalled-asr",
+    write: async () => {},
+    markGap: async () => {},
+    close: async () => {},
+    abort: async () => {},
+    async *[Symbol.asyncIterator](): AsyncGenerator<RealtimeAsrEvent> {
+      const { promise } = Promise.withResolvers<never>();
+      yield await promise;
+    },
+  };
+  const queuedChunks = [{ id: "unconsumed", pcmBase64: Buffer.from([1]).toString("base64") }];
+
+  const cappedNode = createXnewsRealtimeAsrNode({
+    backend: "endless",
+    maxEventsPerStep: 3,
+  });
+  const cappedError = await rejectionError(
+    cappedNode(
+      { queuedChunks },
+      {
+        context: {
+          realtimeAsrBackends: { endless: { id: "endless-asr", open: async () => endlessSession } },
+          timeoutMs: 100,
+        },
+      },
+    ),
+  );
+  expect(cappedError.message).toBe("Node operation failed");
+  expect(queuedChunks[0]?.id).toBe("unconsumed");
+
+  const stalledNode = createXnewsRealtimeAsrNode({ backend: "stalled" });
+  const stalledError = await rejectionError(
+    stalledNode(
+      { queuedChunks },
+      {
+        context: {
+          realtimeAsrBackends: { stalled: { id: "stalled-asr", open: async () => stalledSession } },
+          timeoutMs: 10,
+        },
+      },
+    ),
+  );
+  expect(stalledError.message).toBe("Node operation failed");
+  expect(queuedChunks[0]?.id).toBe("unconsumed");
+});
+
+test("realtime ASR node treats a stream ending exactly at the event cap as complete", async () => {
+  const exactSession: RealtimeAsrSession = {
+    backend: "exact-asr",
+    write: async () => {},
+    markGap: async () => {},
+    close: async () => {},
+    abort: async () => {},
+    async *[Symbol.asyncIterator](): AsyncGenerator<RealtimeAsrEvent> {
+      for (const sequence of [1, 2, 3]) {
+        yield {
+          type: "status",
+          state: "ready",
+          backend: "exact-asr",
+          sequence,
+          generation: 1,
+        };
+      }
+    },
+  };
+  const node = createXnewsRealtimeAsrNode({ backend: "exact", maxEventsPerStep: 3 });
+  const result = await node(
+    { queuedChunks: [{ id: "chunk", pcmBase64: Buffer.from([1]).toString("base64") }] },
+    {
+      context: {
+        realtimeAsrBackends: { exact: { id: "exact-asr", open: async () => exactSession } },
+        timeoutMs: 1_000,
+      },
+    },
+  );
+
+  expect(result.events).toHaveLength(3);
+  expect(result.lastSequence).toBe(3);
   expect(result.consumedChunkIds).toEqual(["chunk"]);
 });
 

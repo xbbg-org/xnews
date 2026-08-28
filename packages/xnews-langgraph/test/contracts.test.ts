@@ -100,6 +100,55 @@ test("runtime and model schemas enforce closed, bounded authority inputs", () =>
       file: "https://attacker.example/private",
     }).success,
   ).toBe(false);
+  expect(
+    XnewsFilesInputSchema.safeParse({ operation: "download_work", record: "host-record" }).success,
+  ).toBe(false);
+});
+
+test("runtime context rejects malformed host-bound work records and files", () => {
+  const record = {
+    provider: "fixture",
+    sourceId: "record-1",
+    title: "Valid record",
+    authors: ["Author"],
+    identity: { origin: "record", confidence: 1, doi: "10.1000/valid" },
+    availability: "open-access",
+    url: "https://catalog.example/record-1",
+    warnings: [],
+    provenance: [{ provider: "fixture", url: "https://catalog.example/record-1" }],
+  } as const;
+  const file = {
+    url: "https://files.example/record-1.pdf",
+    label: "PDF",
+    provider: "fixture",
+    fileName: "record-1.pdf",
+    format: "pdf",
+    sizeBytes: 42,
+  } as const;
+  expect(
+    XnewsRuntimeContextSchema.safeParse({ workRecords: { valid: record } }).success,
+  ).toBeTrue();
+  expect(XnewsRuntimeContextSchema.safeParse({ workFiles: { valid: file } }).success).toBeTrue();
+
+  const malformedRecords = [
+    { ...record, identity: {} },
+    { ...record, identity: { origin: "record", confidence: 2 } },
+    { ...record, availability: "invented" },
+    { ...record, authors: [1] },
+    { ...record, warnings: [false] },
+    { ...record, provenance: [{ provider: "fixture", url: 42 }] },
+    { ...record, pageCount: Number.NaN },
+  ];
+  for (const malformed of malformedRecords) {
+    expect(XnewsRuntimeContextSchema.safeParse({ workRecords: { malformed } }).success).toBeFalse();
+  }
+  for (const malformed of [
+    { ...file, fileName: 42 },
+    { ...file, format: false },
+    { ...file, sizeBytes: Number.POSITIVE_INFINITY },
+  ]) {
+    expect(XnewsRuntimeContextSchema.safeParse({ workFiles: { malformed } }).success).toBeFalse();
+  }
 });
 
 test("runtime context validation is generic and secret traversal is cycle-bounded", () => {

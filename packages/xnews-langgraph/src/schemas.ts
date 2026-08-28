@@ -266,7 +266,7 @@ interface XnewsWorksQuerySelector {
 }
 
 type AtLeastOne<T, Keys extends keyof T = keyof T> = Keys extends keyof T
-  ? Required<Pick<T, Keys>> & Partial<Omit<T, Keys>>
+  ? { readonly [Key in Keys]-?: Exclude<T[Key], undefined> } & Partial<Omit<T, Keys>>
   : never;
 
 export type XnewsWorksQueryFields = XnewsWorksQueryControls & AtLeastOne<XnewsWorksQuerySelector>;
@@ -344,8 +344,7 @@ export const XnewsWorksInputSchema: z.ZodType<XnewsWorksInput, z.ZodTypeDef, unk
 
 export type XnewsFilesInput =
   | { readonly operation: "resolve"; readonly record: string }
-  | { readonly operation: "download_file"; readonly file: string }
-  | { readonly operation: "download_work"; readonly record: string };
+  | { readonly operation: "download_file"; readonly file: string };
 
 export const XnewsFilesInputSchema: z.ZodType<XnewsFilesInput> = z.discriminatedUnion("operation", [
   z
@@ -358,12 +357,6 @@ export const XnewsFilesInputSchema: z.ZodType<XnewsFilesInput> = z.discriminated
     .object({
       operation: z.literal("download_file"),
       file: HostKey.describe("Host-bound work file key"),
-    })
-    .strict(),
-  z
-    .object({
-      operation: z.literal("download_work"),
-      record: HostKey.describe("Host-bound work record key"),
     })
     .strict(),
 ]);
@@ -461,7 +454,10 @@ export const XnewsTranscribeInputSchema: z.ZodType<XnewsTranscribeInput> = z.dis
 
 export type XnewsCatalogInput =
   | { readonly operation: "capabilities" }
-  | { readonly operation: "providers"; readonly seam?: "news" | "research" | "events" | "works" }
+  | {
+      readonly operation: "providers";
+      readonly seam?: "news" | "research" | "events" | "works" | undefined;
+    }
   | { readonly operation: "datasets" }
   | {
       readonly operation: "request_data_urls";

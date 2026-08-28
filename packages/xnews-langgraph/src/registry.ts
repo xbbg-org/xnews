@@ -269,7 +269,7 @@ export const XNEWS_CAPABILITY_REGISTRY = [
   },
   {
     tool: "xnews_files",
-    operations: ["resolve", "download_file", "download_work"],
+    operations: ["resolve", "download_file"],
     description: "Host-bound work-file discovery and bounded downloads.",
     finite: true,
     runtimeContextOnly: ["workRecords", "workFiles", "mirrors", "credentials"],

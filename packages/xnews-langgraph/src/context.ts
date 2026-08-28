@@ -79,6 +79,12 @@ const hasString = (value: Readonly<Record<string, unknown>>, key: string): boole
   typeof value[key] === "string";
 const hasFunction = (value: Readonly<Record<string, unknown>>, key: string): boolean =>
   typeof value[key] === "function";
+const hasOptionalString = (value: Readonly<Record<string, unknown>>, key: string): boolean =>
+  value[key] === undefined || typeof value[key] === "string";
+const hasOptionalFiniteNumber = (value: Readonly<Record<string, unknown>>, key: string): boolean =>
+  value[key] === undefined || (typeof value[key] === "number" && Number.isFinite(value[key]));
+const isStringArray = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
 const isDataSource = (value: unknown): value is DataSource<unknown> =>
   isRecord(value) &&
   hasString(value, "provider") &&
@@ -96,22 +102,67 @@ const isWorksSource = (value: unknown): value is WorksSource =>
   hasString(value, "provider") &&
   hasFunction(value, "requestUrls") &&
   hasFunction(value, "search");
+const WORK_AVAILABILITY = new Set([
+  "open-access",
+  "public-domain",
+  "preview",
+  "borrow",
+  "metadata-only",
+  "unknown",
+]);
+const WORK_IDENTITY_KEYS = [
+  "isbn13",
+  "isbn10",
+  "doi",
+  "oclc",
+  "lccn",
+  "openLibraryId",
+  "md5",
+] as const;
+const WORK_RECORD_OPTIONAL_STRING_KEYS = [
+  "subtitle",
+  "publisher",
+  "edition",
+  "series",
+  "language",
+  "format",
+  "addedAt",
+  "modifiedAt",
+] as const;
+const WORK_RECORD_OPTIONAL_NUMBER_KEYS = ["publishedYear", "pageCount", "sizeBytes"] as const;
+const isWorkIdentity = (value: unknown): boolean =>
+  isRecord(value) &&
+  (value["origin"] === "record" || value["origin"] === "resolved") &&
+  typeof value["confidence"] === "number" &&
+  Number.isFinite(value["confidence"]) &&
+  value["confidence"] >= 0 &&
+  value["confidence"] <= 1 &&
+  WORK_IDENTITY_KEYS.every((key) => hasOptionalString(value, key));
+const isWorkRecordProvenance = (value: unknown): boolean =>
+  isRecord(value) && hasString(value, "provider") && hasString(value, "url");
 const isWorkRecord = (value: unknown): value is WorkRecord =>
   isRecord(value) &&
   hasString(value, "provider") &&
   hasString(value, "sourceId") &&
   hasString(value, "title") &&
   hasString(value, "url") &&
-  Array.isArray(value["authors"]) &&
-  Array.isArray(value["warnings"]) &&
+  isStringArray(value["authors"]) &&
+  isStringArray(value["warnings"]) &&
   Array.isArray(value["provenance"]) &&
-  isRecord(value["identity"]) &&
-  hasString(value, "availability");
+  value["provenance"].every(isWorkRecordProvenance) &&
+  isWorkIdentity(value["identity"]) &&
+  typeof value["availability"] === "string" &&
+  WORK_AVAILABILITY.has(value["availability"]) &&
+  WORK_RECORD_OPTIONAL_STRING_KEYS.every((key) => hasOptionalString(value, key)) &&
+  WORK_RECORD_OPTIONAL_NUMBER_KEYS.every((key) => hasOptionalFiniteNumber(value, key));
 const isWorkFile = (value: unknown): value is WorkFile =>
   isRecord(value) &&
   hasString(value, "url") &&
   hasString(value, "label") &&
-  hasString(value, "provider");
+  hasString(value, "provider") &&
+  hasOptionalString(value, "fileName") &&
+  hasOptionalString(value, "format") &&
+  hasOptionalFiniteNumber(value, "sizeBytes");
 const isRealtimeAsrBackend = (value: unknown): value is RealtimeAsrBackend =>
   isRecord(value) && hasString(value, "id") && hasFunction(value, "open");
 const RuntimeFetchSchema = z.custom<XnewsSourceFetch>(
@@ -137,7 +188,13 @@ const RuntimeMirrorsSchema = z.custom<readonly string[]>(
   "Expected at most 16 mirror URLs",
 );
 
-const XnewsRuntimeContextShape = {
+type XnewsRuntimeContextZodShape = {
+  [Key in keyof XnewsRuntimeContext]-?: z.ZodOptional<
+    z.ZodType<Exclude<XnewsRuntimeContext[Key], undefined>>
+  >;
+};
+
+const XnewsRuntimeContextShape: XnewsRuntimeContextZodShape = {
   fetch: RuntimeFetchSchema.optional(),
   signal: RuntimeSignalSchema.optional(),
   timeoutMs: RuntimeNonnegativeInteger.optional(),
@@ -195,7 +252,7 @@ const XnewsRuntimeContextShape = {
 };
 
 export const XnewsRuntimeContextSchema: z.ZodObject<
-  z.ZodRawShape,
+  typeof XnewsRuntimeContextShape,
   "strict",
   z.ZodTypeAny,
   XnewsRuntimeContext,

@@ -14,6 +14,10 @@ import { isRecord } from "./type-guards.js";
 const REDACTED = "[REDACTED]";
 const SENSITIVE_KEY =
   /(?:api.?key|authorization|bearer|cookie|credential|password|secret|token|sec.?user.?agent|user.?agent|email|phone|contact|mirror|base.?url)/i;
+export function isSensitiveDataKey(key: string): boolean {
+  return SENSITIVE_KEY.test(key);
+}
+
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
 const PHONE =
   /(?<![\w])(?:\+[1-9]\d{9,14}|(?:\+?\d{1,3}[\s.-])?(?:\(\d{2,4}\)|\d{2,4})[\s.-]\d{3,4}[\s.-]\d{4})(?![\w])/gu;
@@ -291,7 +295,7 @@ function sanitizeArtifact(
   budget: BinaryBudget,
   key?: string,
 ): unknown {
-  if (key !== undefined && SENSITIVE_KEY.test(key)) return REDACTED;
+  if (key !== undefined && isSensitiveDataKey(key)) return REDACTED;
   if (typeof value === "string")
     return looksLikeUrl(value) ? redactUrl(value, secrets) : redactText(value, secrets);
   if (value instanceof Uint8Array) return binaryArtifact(value, budget);
@@ -312,7 +316,7 @@ function sanitizeArtifact(
   for (const entryKey of Object.keys(value).toSorted()) {
     const redactedKey = redactText(entryKey, secrets);
     const outputKey =
-      SENSITIVE_KEY.test(entryKey) || redactedKey !== entryKey ? REDACTED : entryKey;
+      isSensitiveDataKey(entryKey) || redactedKey !== entryKey ? REDACTED : entryKey;
     output[outputKey] = sanitizeArtifact(value[entryKey], secrets, budget, entryKey);
   }
   return output;

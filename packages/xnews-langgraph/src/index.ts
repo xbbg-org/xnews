@@ -2,7 +2,9 @@ export { createXnewsAnalyst } from "./analyst.js";
 export type {
   CreateXnewsAnalystOptions,
   XnewsAnalyst,
+  XnewsAnalystContextSchemaLike,
   XnewsAnalystState,
+  XnewsAnalystResultSchemaLike,
   XnewsCheckpointer,
 } from "./analyst.js";
 
