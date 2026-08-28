@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-28
+
 ### Fixed
 
 - YouTube caption fetches now require the provider-selected track URL to be HTTPS, free of embedded credentials, and hosted under `youtube.com`, `youtube-nocookie.com`, or `googlevideo.com`. The player API response chooses the URL for the second request, so an attacker-influenced or compromised response could previously aim that request at any origin the process could reach, including cloud instance metadata.
@@ -132,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Published bundle now links its source map. `--sourcemap=external` emitted `dist/index.js.map` without a `sourceMappingURL` comment, shipping ~308 KB of unreachable data.
 - Declaration maps no longer point at `../src`, which is not part of the published tarball; `declarationMap` is disabled for the build config.
 
-[Unreleased]: https://github.com/xbbg-org/xnews/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/xbbg-org/xnews/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/xbbg-org/xnews/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/xbbg-org/xnews/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/xbbg-org/xnews/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/xbbg-org/xnews/releases/tag/v0.1.0
