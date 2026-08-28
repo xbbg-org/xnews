@@ -1005,6 +1005,9 @@ console.log(transcript.text); // full transcript as one string
 ```
 
 Tracks are listed via the InnerTube player API (whose caption URLs remain readable server-side) with the watch page as fallback, and both timedtext formats (`srv1` and `srv3`) are parsed. Track choice prefers exact language matches, then the same base language ("en" matches "en-US"), manual captions over auto-generated ones, then any available track. Videos without captions throw.
+Before fetching a selected track, xnews requires HTTPS with no embedded credentials and an
+origin under `youtube.com`, `youtube-nocookie.com`, or `googlevideo.com`; provider-supplied
+caption URLs outside those origins are rejected.
 
 ### Realtime audio transcription
 

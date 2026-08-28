@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- YouTube caption fetches now require the provider-selected track URL to be HTTPS, free of embedded credentials, and hosted under `youtube.com`, `youtube-nocookie.com`, or `googlevideo.com`. The player API response chooses the URL for the second request, so an attacker-influenced or compromised response could previously aim that request at any origin the process could reach, including cloud instance metadata.
+
 ## [0.2.0] - 2026-08-25
 
 ### Breaking

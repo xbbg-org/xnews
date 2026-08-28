@@ -51,6 +51,26 @@ const YOUTUBE_PLAYER_API_URL = "https://www.youtube.com/youtubei/v1/player?prett
  */
 const ANDROID_CLIENT_VERSION = "20.10.38";
 const ANDROID_USER_AGENT = `com.google.android.youtube/${ANDROID_CLIENT_VERSION} (Linux; U; Android 11) gzip`;
+const YOUTUBE_CAPTION_HOSTS = ["youtube.com", "youtube-nocookie.com", "googlevideo.com"] as const;
+
+function isAllowedYoutubeCaptionUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const hostname = url.hostname.toLowerCase().replace(/\.$/u, "");
+  return (
+    url.protocol === "https:" &&
+    url.username.length === 0 &&
+    url.password.length === 0 &&
+    (url.port === "" || url.port === "443") &&
+    YOUTUBE_CAPTION_HOSTS.some(
+      (allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`),
+    )
+  );
+}
 
 /**
  * Extracts the 11-character video ID from a bare ID, a watch/shorts/embed/
@@ -140,6 +160,9 @@ export async function fetchYoutubeTranscript(
     throw new Error(
       `No caption tracks found for YouTube video ${videoId}${playerNote} (captions may be disabled, or YouTube served no player data)`,
     );
+  }
+  if (!isAllowedYoutubeCaptionUrl(track.url)) {
+    throw new Error("YouTube returned a caption URL outside the allowed HTTPS origins");
   }
 
   const captionBody = await fetchText(

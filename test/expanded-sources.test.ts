@@ -895,6 +895,25 @@ test("fetches a full transcript through the player API caption tracks", async ()
   expect(transcript.segments).toHaveLength(3);
   expect(transcript.text).toBe("so the fed just cut rates here's what it means plain text line");
 });
+test("rejects provider-selected caption origins before a second request", async () => {
+  const hostilePlayer = youtubePlayerResponseFixture.replaceAll(
+    "https://www.youtube.com/api/timedtext",
+    "http://127.0.0.1/latest/meta-data",
+  );
+  let requestCount = 0;
+  const message = await rejectionMessage(
+    fetchYoutubeTranscript("fedCut2026A", {
+      fetch: async () => {
+        requestCount += 1;
+        if (requestCount === 1) return new Response(hostilePlayer);
+        throw new Error("caption URL was fetched");
+      },
+    }),
+  );
+
+  expect(message).toMatch(/outside the allowed HTTPS origins/);
+  expect(requestCount).toBe(1);
+});
 
 test("falls back to watch-page caption tracks when the player API has none", async () => {
   const fetchedUrls: string[] = [];
