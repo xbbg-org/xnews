@@ -1,8 +1,9 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
+import { interopParse } from "@langchain/core/utils/types";
 import type { InteropZodObject, InteropZodType } from "@langchain/core/utils/types";
-import { createAgent, toolStrategy, type AgentTypeConfig, type ReactAgent } from "langchain";
+import { ToolStrategy, createAgent, type AgentTypeConfig, type ReactAgent } from "langchain";
 import type { ZodType as Zod3Type, ZodTypeDef as Zod3TypeDef } from "zod/v3";
 import type { ZodType as Zod4Type } from "zod/v4";
 
@@ -12,6 +13,11 @@ import {
   XnewsRuntimeContextSchema,
   type XnewsAnalystResult,
 } from "./schemas.js";
+import { projectToolSchema } from "./tool-schema.js";
+import { isRecord } from "./type-guards.js";
+
+/** Stable name for the structured-result tool, in place of LangChain's `extract-N`. */
+const ANALYST_RESULT_TOOL = "xnews_analyst_result";
 
 const DEFAULT_SYSTEM_PROMPT = `You are an evidence-first news and research analyst.
 Use xnews tools when current or source-backed information is needed. Distinguish provider failure,
@@ -103,14 +109,32 @@ export function createXnewsAnalyst(options: CreateXnewsAnalystOptions): XnewsAna
 export function createXnewsAnalyst(
   options: CreateXnewsAnalystOptions<InteropZodObject>,
 ): XnewsAnalyst<InteropZodObject> {
+  const resultSchema = (options.resultSchema ??
+    XnewsAnalystResultSchema) as InteropZodType<XnewsAnalystResult>;
+  // Two defects sit in LangChain's default `toolStrategy(zodSchema)` path. It advertises
+  // the unprojected JSON Schema, which no longer fits Gemini's decoding budget beside ten
+  // tools; and `ToolStrategy.parse` only JSON-Schema-validates before returning the
+  // model's own arguments, so the result schema's redaction transforms never run even
+  // though `AgentNode` copies that value into `structuredResponse`, a `ToolMessage`, and a
+  // final `AIMessage`. Advertise the projection and parse with the source schema, so every
+  // stored copy is the transformed one and a rejection still uses the built-in retry path.
+  const advertised: unknown = projectToolSchema(resultSchema).jsonSchema;
+  if (!isRecord(advertised)) throw new Error("Analyst result schema must project to an object");
+  const strategy: ToolStrategy<XnewsAnalystResult> = ToolStrategy.fromSchema({
+    ...advertised,
+    title: ANALYST_RESULT_TOOL,
+    description: "Return the final structured analyst result.",
+  });
+  strategy.parse = (toolArgs: Record<string, unknown>): Record<string, unknown> => ({
+    ...interopParse(resultSchema, toolArgs),
+  });
+
   return createAgent({
     model: options.model,
     tools: [...(options.tools ?? createXnewsTools())],
     systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
     contextSchema: options.contextSchema ?? XnewsRuntimeContextSchema,
-    responseFormat: toolStrategy(
-      (options.resultSchema ?? XnewsAnalystResultSchema) as InteropZodType<XnewsAnalystResult>,
-    ),
+    responseFormat: strategy,
     ...(options.checkpointer === undefined ? {} : { checkpointer: options.checkpointer }),
   });
 }

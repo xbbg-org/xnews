@@ -37,6 +37,21 @@ model can call `download_file`. There is no operation that resolves and follows 
 URL in one step. YouTube caption discovery likewise follows only HTTPS caption URLs on
 YouTube/Google-owned caption origins.
 
+Model-facing schemas are projected, not raw. Each seam's discriminated `operation` union is
+flattened into one closed object whose property descriptions state which operations require or
+accept each field, internal JSON Schema references are inlined, and bounded-repetition keywords
+(`pattern`, `minLength`, `maxLength`, `minItems`, `maxItems`) are omitted. That is the only shape
+every major provider accepts: OpenAI rejects a root that is not `type: "object"`, Anthropic
+rejects `anyOf` at the root of a tool schema, and Gemini rejects the decoding-state count that
+union-rooted or repetition-bounded schemas produce across a bound tool set.
+
+The Zod schemas stay the contract. Omitted bounds are still enforced when the tool runs, and a
+call that violates one returns an actionable error the agent can retry. Properties that belong to
+a different operation of the same union are dropped instead of rejected, since the flattened
+schema advertised them; properties no operation declares are still rejected. `projectToolSchema`
+is exported for hosts that bind their own tools, returning both the portable `jsonSchema` and the
+matching `reconcile`.
+
 ```ts
 import { cotDataSource } from "@xbbg/xnews";
 import { createXnewsTools, type XnewsRuntimeContext } from "@xbbg/xnews-langgraph";
@@ -110,13 +125,16 @@ for await (const update of await analyst.stream(
 }
 ```
 
-By default the analyst binds all ten tools and validates `structuredResponse` with
-`XnewsAnalystResultSchema`. `tools`, `systemPrompt`, `contextSchema`, `resultSchema`, and
-`checkpointer` may be supplied explicitly. A custom context schema should extend
-`XnewsRuntimeContextSchema`; extra fields remain available to custom tools while the
-built-in tools parse only the allowlisted runtime fields. A custom result schema must
-retain the `XnewsAnalystResult` contract and is responsible for equivalent PII and URL
-redaction. The package chooses no persistence backend.
+By default the analyst binds all ten tools and parses `structuredResponse` with
+`XnewsAnalystResultSchema`. The result tool advertises the projected schema, and the model's
+arguments are parsed with the result schema itself rather than only JSON-Schema-validated, so its
+transforms apply to `structuredResponse` and to the `ToolMessage` and closing `AIMessage` the
+agent derives from it — the copies a checkpointer persists. `tools`, `systemPrompt`,
+`contextSchema`, `resultSchema`, and `checkpointer` may be supplied explicitly. A custom context
+schema should extend `XnewsRuntimeContextSchema`; extra fields remain available to custom tools
+while the built-in tools parse only the allowlisted runtime fields. A custom result schema must
+retain the `XnewsAnalystResult` contract and is responsible for equivalent PII and URL redaction.
+The package chooses no persistence backend.
 
 ## Finite watcher nodes
 

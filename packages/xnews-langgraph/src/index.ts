@@ -109,4 +109,7 @@ export type {
   XnewsWorksSearchInput,
 } from "./schemas.js";
 
+export { projectToolSchema } from "./tool-schema.js";
+export type { XnewsToolSchemaProjection } from "./tool-schema.js";
+
 export { createXnewsTools } from "./tools/index.js";

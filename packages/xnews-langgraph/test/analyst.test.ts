@@ -117,3 +117,85 @@ test("provider-agnostic analyst preserves tool artifacts and validates structure
   );
   expect(result.structuredResponse.summary).toContain("one observation");
 });
+
+/**
+ * `AgentNode` copies the parsed structured output into `structuredResponse`, a
+ * `ToolMessage`, and a closing `AIMessage`, and a checkpointer persists all three. The
+ * result schema's redaction therefore has to run inside the response strategy, not after
+ * the agent, or a model-authored address or credential URL is stored verbatim.
+ */
+class LeakingResultModel extends BaseChatModel {
+  #tools: BindToolsInput[] = [];
+
+  _llmType(): string {
+    return "leaking-xnews";
+  }
+
+  override bindTools(tools: BindToolsInput[]): this {
+    this.#tools = tools;
+    return this;
+  }
+
+  async _generate(): Promise<ChatResult> {
+    const structuredTool = this.#tools
+      .map(boundToolName)
+      .find(
+        (name) => name !== undefined && !(XNEWS_TOOL_NAMES as readonly string[]).includes(name),
+      );
+    if (structuredTool === undefined) throw new Error("Structured response tool was not bound");
+    return responseWithToolCall(
+      structuredTool,
+      {
+        summary: "Contact analyst@example.com for the raw file.",
+        claims: [
+          {
+            statement: "The desk replied from analyst@example.com.",
+            evidence: ["mailto:analyst@example.com"],
+            confidence: 0.5,
+          },
+        ],
+        sources: [
+          {
+            id: "fixture:leak",
+            provider: "fixture",
+            url: "https://data.test/daily?api_key=super-secret-token",
+          },
+        ],
+        uncertainty: [],
+        limitations: ["Fixture-only analysis."],
+        providerDiagnostics: [{ provider: "fixture", status: "ok", warningCount: 0 }],
+        generatedAt: "2026-08-25T12:00:00.000Z",
+      },
+      "structured-leak",
+    );
+  }
+}
+
+test("model-authored PII and credentials are redacted in every derived copy", async () => {
+  const analyst = createXnewsAnalyst({ model: new LeakingResultModel({}) });
+  const result = await analyst.invoke(
+    { messages: [{ role: "user", content: "Summarize the fixture." }] },
+    { context: {} },
+  );
+
+  // The agent derives three copies from the parsed result: the structured response, a
+  // ToolMessage carrying its JSON, and the closing AIMessage. A checkpointer persists all
+  // three, so all three must be the transformed value.
+  const finalMessage = result.messages.at(-1);
+  const derived = [
+    JSON.stringify(result.structuredResponse),
+    JSON.stringify(finalMessage?.content),
+    ...result.messages
+      .filter((message) => ToolMessage.isInstance(message))
+      .map((message) => JSON.stringify(message.content)),
+  ];
+  for (const secret of ["analyst@example.com", "super-secret-token"]) {
+    for (const copy of derived) {
+      expect(copy, `derived copy leaks ${secret}`).not.toContain(secret);
+    }
+  }
+  expect(result.structuredResponse.summary).toContain("[REDACTED]");
+  // A redacted URL keeps its shape, so the marker arrives percent-encoded.
+  expect(result.structuredResponse.sources[0]?.url).toContain("%5BREDACTED%5D");
+  expect(derived.some((copy) => copy.includes("[REDACTED]"))).toBeTrue();
+});

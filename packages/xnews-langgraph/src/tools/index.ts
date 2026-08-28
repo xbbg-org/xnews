@@ -35,7 +35,6 @@ import {
   type WorksQuery,
   type WorksSource,
 } from "@xbbg/xnews";
-import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { tool, type ToolRuntime } from "langchain";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 
@@ -69,11 +68,27 @@ import {
   type XnewsCatalogInput,
   type XnewsExtractInput,
 } from "../schemas.js";
+import { projectToolSchema } from "../tool-schema.js";
 import { isRecord } from "../type-guards.js";
 
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 const MAX_MODEL_DOWNLOAD_BYTES = 64 * 1024 * 1024;
 const MAX_FINITE_ASR_EVENTS = 1_000;
+
+// One projection per seam, built once: each carries the provider-portable JSON Schema
+// the model sees and the reconciliation from that flattened shape back onto the union.
+const TOOL_SCHEMAS = {
+  news: projectToolSchema(XnewsNewsInputSchema),
+  research: projectToolSchema(XnewsResearchInputSchema),
+  data: projectToolSchema(XnewsDataInputSchema),
+  events: projectToolSchema(XnewsEventsInputSchema),
+  works: projectToolSchema(XnewsWorksInputSchema),
+  files: projectToolSchema(XnewsFilesInputSchema),
+  extract: projectToolSchema(XnewsExtractInputSchema),
+  ocr: projectToolSchema(XnewsOcrInputSchema),
+  transcribe: projectToolSchema(XnewsTranscribeInputSchema),
+  catalog: projectToolSchema(XnewsCatalogInputSchema),
+} as const;
 
 type DefinedInput<T> = T extends readonly (infer Item)[]
   ? readonly DefinedInput<Item>[]
@@ -113,7 +128,7 @@ function hasNoUndefinedProperties<T>(value: T): value is T & DefinedInput<T> {
 export function createXnewsTools(options: XnewsToolOptions = {}): StructuredToolInterface[] {
   const news = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsNewsInputSchema, value);
+      const input = parseModelInput(XnewsNewsInputSchema, TOOL_SCHEMAS.news.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const common = newsOptions(input, context);
@@ -148,14 +163,17 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_news",
       description: "Fetch normalized company, topic, or watchlist news with provider diagnostics.",
-      schema: toJsonSchema(XnewsNewsInputSchema),
+      schema: TOOL_SCHEMAS.news.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const research = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsResearchInputSchema, value);
+      const input = parseModelInput(
+        XnewsResearchInputSchema,
+        TOOL_SCHEMAS.research.reconcile(value),
+      );
       const context = requireRuntimeContext(runtime.context);
       try {
         const result = await buildTopicNewsFeedResult({
@@ -199,14 +217,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_research",
       description: "Search normalized research papers with research-provider filters.",
-      schema: toJsonSchema(XnewsResearchInputSchema),
+      schema: TOOL_SCHEMAS.research.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const data = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsDataInputSchema, value);
+      const input = parseModelInput(XnewsDataInputSchema, TOOL_SCHEMAS.data.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const source = requireDataSource(context, input.source);
@@ -236,14 +254,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_data",
       description: "Fetch one release from a host-bound structured-data source.",
-      schema: toJsonSchema(XnewsDataInputSchema),
+      schema: TOOL_SCHEMAS.data.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const events = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsEventsInputSchema, value);
+      const input = parseModelInput(XnewsEventsInputSchema, TOOL_SCHEMAS.events.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const fetchOptions: EventFetchOptions = {
@@ -292,14 +310,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_events",
       description: "Fetch one active-event snapshot or merge snapshots across host-bound sources.",
-      schema: toJsonSchema(XnewsEventsInputSchema),
+      schema: TOOL_SCHEMAS.events.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const works = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsWorksInputSchema, value);
+      const input = parseModelInput(XnewsWorksInputSchema, TOOL_SCHEMAS.works.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         if (input.operation === "resolve_identity") {
@@ -367,14 +385,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_works",
       description: "Search host-bound work catalogs or resolve bibliographic identity.",
-      schema: toJsonSchema(XnewsWorksInputSchema),
+      schema: TOOL_SCHEMAS.works.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const files = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsFilesInputSchema, value);
+      const input = parseModelInput(XnewsFilesInputSchema, TOOL_SCHEMAS.files.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const fileOptions = {
@@ -430,14 +448,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_files",
       description: "Resolve work files or download a bounded file into the host-only artifact.",
-      schema: toJsonSchema(XnewsFilesInputSchema),
+      schema: TOOL_SCHEMAS.files.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const extract = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsExtractInputSchema, value);
+      const input = parseModelInput(XnewsExtractInputSchema, TOOL_SCHEMAS.extract.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const bytes = requireBinaryArtifact(context, input.artifact);
@@ -478,14 +496,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_extract",
       description: "Parse a host-held document, archive, spreadsheet, or CSV artifact.",
-      schema: toJsonSchema(XnewsExtractInputSchema),
+      schema: TOOL_SCHEMAS.extract.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const ocr = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsOcrInputSchema, value);
+      const input = parseModelInput(XnewsOcrInputSchema, TOOL_SCHEMAS.ocr.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const images =
@@ -516,14 +534,17 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_ocr",
       description: "OCR host-held images or PDF pages using host-controlled service configuration.",
-      schema: toJsonSchema(XnewsOcrInputSchema),
+      schema: TOOL_SCHEMAS.ocr.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const transcribe = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsTranscribeInputSchema, value);
+      const input = parseModelInput(
+        XnewsTranscribeInputSchema,
+        TOOL_SCHEMAS.transcribe.reconcile(value),
+      );
       const context = requireRuntimeContext(runtime.context);
       try {
         if (input.operation === "youtube_captions") {
@@ -576,14 +597,14 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
     {
       name: "xnews_transcribe",
       description: "Fetch finite YouTube captions or transcribe finite host-held PCM chunks.",
-      schema: toJsonSchema(XnewsTranscribeInputSchema),
+      schema: TOOL_SCHEMAS.transcribe.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
 
   const catalog = tool(
     async (value, runtime: ToolRuntime<unknown, XnewsRuntimeContext>) => {
-      const input = parseModelInput(XnewsCatalogInputSchema, value);
+      const input = parseModelInput(XnewsCatalogInputSchema, TOOL_SCHEMAS.catalog.reconcile(value));
       const context = requireRuntimeContext(runtime.context);
       try {
         const result = catalogResult(input, context);
@@ -606,7 +627,7 @@ export function createXnewsTools(options: XnewsToolOptions = {}): StructuredTool
       name: "xnews_catalog",
       description:
         "Inspect capabilities, providers, datasets, host-bound sources, or redacted URL previews.",
-      schema: toJsonSchema(XnewsCatalogInputSchema),
+      schema: TOOL_SCHEMAS.catalog.jsonSchema,
       responseFormat: "content_and_artifact",
     },
   );
