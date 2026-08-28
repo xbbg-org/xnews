@@ -4,6 +4,10 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The companion now shares the core's version line: `@xbbg/xnews-langgraph` and `@xbbg/xnews` are released at the same version, and the `@xbbg/xnews` peer range is the version they ship together (`^0.2.1`). Nothing else changed from `0.1.0`; the jump from `0.1.0` to `0.2.1` is the alignment itself, not new behavior.
+
 ## [0.1.0] - 2026-08-25
 
 ### Added

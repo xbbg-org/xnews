@@ -102,20 +102,18 @@ from an allowlist, requires the selected manifest name and version to match the 
 publishes from that package directory, and creates release notes from that package's
 changelog. Retries are idempotent.
 
-The prepared `0.1.0` companion is the one exception to the bump command above. Its first
-publication is still workflow-only. Before dispatching it, protect the `npm-publish`
-GitHub environment with required reviewers and store `NPM_BOOTSTRAP_TOKEN` as an
-environment secret. The token must be short-lived, granular, limited to the `@xbbg`
-scope and package publication, and must not grant account-management permissions.
+Both packages share one version line: a companion release carries the same version as the
+core release it is tested against, and its `@xbbg/xnews` peer range names that version.
+Release the core first when both change, then the companion at the same version. The two
+are still tagged, packed, gated, and published separately — the shared number is a
+compatibility statement, not a monorepo-wide bump.
 
-Dispatch **Publish npm Package** from the current `main` branch for `langgraph` version
-`0.1.0` with `bootstrap` enabled. The workflow verifies and packs without release
-credentials, publishes the immutable tarball in the protected environment, confirms the
-npm version, and only then creates `xnews-langgraph-v0.1.0`. Delete the bootstrap secret
-immediately after success, then configure npm trusted publishing for the exact
-`npm-publish.yml` workflow. Bootstrap fails closed for registry errors and is rejected
-for core, tag-push events, non-`main` commits, existing tags, or an existing package. All
-subsequent companion releases use the release CLI and OIDC.
+Both packages are published and configured for npm trusted publishing against this exact
+workflow, so no npm token belongs in the repository. The `npm-publish` environment is
+protected by required reviewers; a release waits for that approval before the publish job
+runs. The `bootstrap` dispatch input exists only for a package that has never been
+published, and it is rejected for core, tag-push events, non-`main` commits, existing
+tags, or an existing package.
 
 ## License
 
