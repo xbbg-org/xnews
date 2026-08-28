@@ -45,7 +45,7 @@ test("root remains a publishable zero-runtime-dependency workspace package", asy
   // Same snapshot hazard as CI: any script that both builds core and re-links it
   // into the companion must build first, or the companion gates run against a
   // copied core that has no `dist`.
-  for (const name of ["test:langgraph", "quality:langgraph"]) {
+  for (const name of ["test:langgraph", "quality:langgraph", "smoke:packaged-install:langgraph"]) {
     const script = rootScript(root, name);
     expect(script).toContain("bun run install:langgraph");
     expect(script.indexOf("bun run build:core")).toBeLessThan(
@@ -69,12 +69,18 @@ test("CI builds local core before companion gates and pins both Zod floors", asy
 
   // `bun install --cwd` copies the core package tree into the install store rather
   // than symlinking it, so a link taken before `dist` exists snapshots a core with
-  // no type declarations and every companion import fails to resolve.
-  const linkIndex = workflow.indexOf(
-    "bun install --cwd packages/xnews-langgraph --frozen-lockfile",
+  // no type declarations and every companion import fails to resolve. Every job that
+  // links must therefore build first, including the packaged-install job, whose
+  // `npm pack` runs the companion's `prepack` build.
+  const linkIndices = [...workflow.matchAll(/bun install --cwd packages\/xnews-langgraph/gu)].map(
+    (match) => match.index,
   );
-  expect(linkIndex).toBeGreaterThan(-1);
-  expect(workflow.indexOf("run: bun run build:core")).toBeLessThan(linkIndex);
+  expect(linkIndices.length).toBeGreaterThanOrEqual(2);
+  for (const linkIndex of linkIndices) {
+    const buildIndex = workflow.lastIndexOf("run: bun run build:core", linkIndex);
+    expect(buildIndex).toBeGreaterThan(-1);
+    expect(buildIndex).toBeLessThan(linkIndex);
+  }
 });
 
 test("publish workflow allowlists packages and separates verification from authority", async () => {

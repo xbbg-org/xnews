@@ -96,6 +96,9 @@ jobs:
       - name: Build local core first
         run: bun run build:core
 
+      - name: Link the built local core into the companion
+        run: bun install --cwd packages/xnews-langgraph --frozen-lockfile
+
       - name: Pack and install local core and companion
         run: >-
           bun run --cwd packages/xnews-langgraph smoke:packaged-install --

@@ -124,7 +124,7 @@
     "smoke:ffiec-e16": "bun run ./scripts/smoke-ffiec-e16.ts",
     "smoke:packaged-install": "bun run smoke:packaged-install:core && bun run smoke:packaged-install:langgraph",
     "smoke:packaged-install:core": "bun run ./scripts/smoke-packaged-install.ts",
-    "smoke:packaged-install:langgraph": "bun run build:core && bun run --cwd packages/xnews-langgraph smoke:packaged-install",
+    "smoke:packaged-install:langgraph": "bun run build:core && bun run install:langgraph && bun run --cwd packages/xnews-langgraph smoke:packaged-install",
     "changelog:section": "bun run ./scripts/changelog.ts section",
     "release": "bun run ./scripts/release.ts"
   },
