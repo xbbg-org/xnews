@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
+import { isRecord } from "../src/json.js";
+
 const ROOT_MANIFEST_PATH = new URL("../package.json", import.meta.url);
 const COMPANION_MANIFEST_PATH = new URL(
   "../packages/xnews-langgraph/package.json",
@@ -8,6 +10,13 @@ const COMPANION_MANIFEST_PATH = new URL(
 );
 const CI_PATH = new URL("../.github/workflows/ci.yml", import.meta.url);
 const PUBLISH_PATH = new URL("../.github/workflows/npm-publish.yml", import.meta.url);
+
+function rootScript(manifest: unknown, name: string): string {
+  const scripts = isRecord(manifest) ? manifest["scripts"] : undefined;
+  const script = isRecord(scripts) ? scripts[name] : undefined;
+  if (typeof script !== "string") throw new Error(`Expected a ${name} script`);
+  return script;
+}
 
 test("root remains a publishable zero-runtime-dependency workspace package", async () => {
   const root: unknown = JSON.parse(await readFile(ROOT_MANIFEST_PATH, "utf8"));
@@ -32,6 +41,17 @@ test("root remains a publishable zero-runtime-dependency workspace package", asy
     devDependencies: { "@xbbg/xnews": "file:../.." },
   });
   expect(companion).not.toHaveProperty("dependencies");
+
+  // Same snapshot hazard as CI: any script that both builds core and re-links it
+  // into the companion must build first, or the companion gates run against a
+  // copied core that has no `dist`.
+  for (const name of ["test:langgraph", "quality:langgraph"]) {
+    const script = rootScript(root, name);
+    expect(script).toContain("bun run install:langgraph");
+    expect(script.indexOf("bun run build:core")).toBeLessThan(
+      script.indexOf("bun run install:langgraph"),
+    );
+  }
 });
 
 test("CI builds local core before companion gates and pins both Zod floors", async () => {
@@ -46,6 +66,15 @@ test("CI builds local core before companion gates and pins both Zod floors", asy
   expect(workflow.indexOf("run: bun run build:core")).toBeLessThan(
     workflow.indexOf("run: bun run --cwd packages/xnews-langgraph quality"),
   );
+
+  // `bun install --cwd` copies the core package tree into the install store rather
+  // than symlinking it, so a link taken before `dist` exists snapshots a core with
+  // no type declarations and every companion import fails to resolve.
+  const linkIndex = workflow.indexOf(
+    "bun install --cwd packages/xnews-langgraph --frozen-lockfile",
+  );
+  expect(linkIndex).toBeGreaterThan(-1);
+  expect(workflow.indexOf("run: bun run build:core")).toBeLessThan(linkIndex);
 });
 
 test("publish workflow allowlists packages and separates verification from authority", async () => {

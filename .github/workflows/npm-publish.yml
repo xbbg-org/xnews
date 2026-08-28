@@ -217,10 +217,6 @@ jobs:
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
 
-      - name: Link the local core workspace into the companion
-        if: needs.release-metadata.outputs.package_id == 'langgraph'
-        run: bun install --cwd packages/xnews-langgraph --frozen-lockfile
-
       - name: Verify manifest identity and version
         env:
           EXPECTED_NAME: ${{ needs.release-metadata.outputs.package_name }}

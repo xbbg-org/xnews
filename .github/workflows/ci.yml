@@ -56,11 +56,14 @@ jobs:
 
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
-      - name: Link the local core workspace into the companion
-        run: bun install --cwd packages/xnews-langgraph --frozen-lockfile
 
+      # `bun install --cwd` snapshots the core package tree, so `dist` must already
+      # exist: link before build and the companion resolves a core without types.
       - name: Build local core first
         run: bun run build:core
+
+      - name: Link the built local core into the companion
+        run: bun install --cwd packages/xnews-langgraph --frozen-lockfile
 
       - name: Run companion quality suite against local core
         run: bun run --cwd packages/xnews-langgraph quality
