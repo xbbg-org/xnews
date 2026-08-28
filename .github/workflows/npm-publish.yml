@@ -483,6 +483,9 @@ jobs:
 
       - name: Create GitHub release from verified notes
         env:
+          # This job never checks out, so `gh` has no git remote to infer the repository
+          # from and every call fails with "not a git repository".
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
           RELEASE_TITLE: ${{ needs.release-metadata.outputs.release_title }}
