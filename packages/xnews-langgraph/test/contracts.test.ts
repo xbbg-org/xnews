@@ -253,25 +253,46 @@ test("digest and artifact caps are deterministic, explicit, and redact operator 
   } satisfies Partial<XnewsByteArtifact>);
 });
 
-test("privacy redaction preserves public identifiers and fails closed for URL capabilities", () => {
+test("redaction covers operator values and leaves public content intact", () => {
   expect(redactText("sec-edgar|0001628280-25-031459|Apple Inc. 10-K")).toBe(
     "sec-edgar|0001628280-25-031459|Apple Inc. 10-K",
   );
   expect(redactText("gdelt-1234567890 ISBN 9780306406157")).toBe(
     "gdelt-1234567890 ISBN 9780306406157",
   );
-  expect(redactText("Contact +1 (212) 555-0100 or ops@example.com")).toBe(
+
+  // Upstream records carry third-party contact details as public record data. Only the
+  // operator's own values, which the host supplied through runtime context, are redacted.
+  const operator = ["jane.operator@example.com", "+1 (212) 555-0100"];
+  expect(redactText("Filer contact: ir@apple.com or +1 (408) 996-1010")).toBe(
+    "Filer contact: ir@apple.com or +1 (408) 996-1010",
+  );
+  expect(redactText("Contact +1 (212) 555-0100 or jane.operator@example.com", operator)).toBe(
     "Contact [REDACTED] or [REDACTED]",
   );
 
-  const safe = redactUrl(
-    "https://files.example.test/download/AbCdEf0123456789AbCdEf0123456789?sig=capability&view=public#private",
+  // A public article URL survives whole: its path is routing, not a secret.
+  const article = redactUrl(
+    "https://news.google.com/rss/articles/CBMifEFVX3lxTFBZMDY3TVNCdDRkUVJT?oc=5&hl=en-US",
   );
-  expect(safe).not.toContain("AbCdEf0123456789AbCdEf0123456789");
-  expect(safe).not.toContain("capability");
-  expect(safe).not.toContain("public");
-  expect(safe).not.toContain("private");
-  expect(safe).toContain("[REDACTED]");
+  expect(article).toBe(
+    "https://news.google.com/rss/articles/CBMifEFVX3lxTFBZMDY3TVNCdDRkUVJT?oc=5&hl=en-US",
+  );
+
+  // A capability URL carries its secret in a credential-named parameter.
+  const capability = redactUrl(
+    "https://files.example.test/download/AbCdEf0123456789AbCdEf0123456789?sig=capability&view=public",
+  );
+  expect(capability).toContain("AbCdEf0123456789AbCdEf0123456789");
+  expect(capability).toContain("view=public");
+  expect(capability).not.toContain("capability");
+  expect(capability).toContain(encodeURIComponent("[REDACTED]"));
+
+  // A host-supplied URL is an operator value, so it is redacted wherever it appears.
+  const hostBound = redactUrl("https://mirror.internal.test/AbCdEf0123456789/file.pdf", [
+    "https://mirror.internal.test/AbCdEf0123456789",
+  ]);
+  expect(hostBound).not.toContain("AbCdEf0123456789");
 
   const embedded = redactText(
     "failed https://files.example.test/item?key=secret-value and Bearer abc.def",

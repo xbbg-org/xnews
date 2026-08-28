@@ -12,18 +12,22 @@ import type { XnewsToolName } from "./registry.js";
 import { isRecord } from "./type-guards.js";
 
 const REDACTED = "[REDACTED]";
-const SENSITIVE_KEY =
-  /(?:api.?key|authorization|bearer|cookie|credential|password|secret|token|sec.?user.?agent|user.?agent|email|phone|contact|mirror|base.?url)/i;
+// Operator-owned credential keys only. Upstream payloads legitimately carry fields such as
+// `email`, `phone`, `contact`, or `userAgent`, and blanking those by name destroys public
+// record data without protecting the operator: every operator value the host supplied is
+// redacted by value through `runtimeSecretValues`.
+const SENSITIVE_KEY = /(?:api.?key|authorization|bearer|cookie|credential|password|secret|token)/i;
 export function isSensitiveDataKey(key: string): boolean {
   return SENSITIVE_KEY.test(key);
 }
 
-const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
-const PHONE =
-  /(?<![\w])(?:\+[1-9]\d{9,14}|(?:\+?\d{1,3}[\s.-])?(?:\(\d{2,4}\)|\d{2,4})[\s.-]\d{3,4}[\s.-]\d{4})(?![\w])/gu;
+// A capability URL carries its secret in a credential-named query parameter. Path segments
+// are public routing — a Google News article id or a Federal Register slug — and a
+// host-supplied URL is already covered by value.
+const SENSITIVE_QUERY_KEY =
+  /(?:^|[_-])(?:api[_-]?key|key|access[_-]?token|auth|credential|password|secret|session|sig(?:nature)?|token)(?:$|[_-])/i;
 const BEARER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/giu;
 const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>"']+/giu;
-const SENSITIVE_PATH_SEGMENT = /^(?=.{24,}$)(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9._~+=/-]+$/u;
 const MAX_SUMMARY_KEYS = 20;
 const MAX_SUMMARY_STRING = 512;
 
@@ -223,7 +227,7 @@ export function failureXnewsToolOutput(
 
 export function redactText(value: string, secrets: readonly string[] = []): string {
   const urlsRedacted = value.replace(URL_IN_TEXT, (candidate) => redactUrl(candidate, secrets));
-  return redactPrivateText(urlsRedacted, secrets);
+  return redactSecretText(urlsRedacted, secrets);
 }
 
 export function redactSecretText(value: string, secrets: readonly string[] = []): string {
@@ -240,43 +244,22 @@ export function redactUrl(value: string, secrets: readonly string[] = []): strin
   try {
     url = new URL(redacted);
   } catch {
-    return redactPrivateText(redacted, secrets);
+    return redacted;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return REDACTED;
   if (url.username.length > 0) url.username = REDACTED;
   if (url.password.length > 0) url.password = REDACTED;
   for (const key of new Set(url.searchParams.keys())) {
+    if (!SENSITIVE_QUERY_KEY.test(key)) continue;
     const valueCount = url.searchParams.getAll(key).length;
     url.searchParams.delete(key);
     for (let index = 0; index < valueCount; index += 1) {
       url.searchParams.append(key, REDACTED);
     }
   }
-  const pathSegments = url.pathname.split("/");
-  url.pathname = pathSegments
-    .map((segment) => (isSensitivePathSegment(segment, secrets) ? REDACTED : segment))
-    .join("/");
-  if (url.hash.length > 0) url.hash = REDACTED;
   return url.toString();
 }
 
-function redactPrivateText(value: string, secrets: readonly string[]): string {
-  return redactSecretText(value, secrets).replace(EMAIL, REDACTED).replace(PHONE, REDACTED);
-}
-
-function isSensitivePathSegment(segment: string, secrets: readonly string[]): boolean {
-  let decoded = segment;
-  try {
-    decoded = decodeURIComponent(segment);
-  } catch {
-    // Treat malformed escaping as opaque and apply the encoded form checks below.
-  }
-  return (
-    decoded.includes(REDACTED) ||
-    secrets.some((secret) => secret.length > 0 && decoded.includes(secret)) ||
-    SENSITIVE_PATH_SEGMENT.test(decoded)
-  );
-}
 export function stableStringify(value: unknown): string {
   try {
     const output = JSON.stringify(sortJson(value));

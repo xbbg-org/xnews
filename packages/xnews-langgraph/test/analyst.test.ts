@@ -121,8 +121,9 @@ test("provider-agnostic analyst preserves tool artifacts and validates structure
 /**
  * `AgentNode` copies the parsed structured output into `structuredResponse`, a
  * `ToolMessage`, and a closing `AIMessage`, and a checkpointer persists all three. The
- * result schema's redaction therefore has to run inside the response strategy, not after
- * the agent, or a model-authored address or credential URL is stored verbatim.
+ * result schema's transforms therefore have to run inside the response strategy, not after
+ * the agent, or a credential-bearing URL is stored verbatim. Public contact details in the
+ * cited record are not the operator's data and stay readable.
  */
 class LeakingResultModel extends BaseChatModel {
   #tools: BindToolsInput[] = [];
@@ -171,7 +172,7 @@ class LeakingResultModel extends BaseChatModel {
   }
 }
 
-test("model-authored PII and credentials are redacted in every derived copy", async () => {
+test("credentials are redacted in every derived copy and public content survives", async () => {
   const analyst = createXnewsAnalyst({ model: new LeakingResultModel({}) });
   const result = await analyst.invoke(
     { messages: [{ role: "user", content: "Summarize the fixture." }] },
@@ -189,13 +190,11 @@ test("model-authored PII and credentials are redacted in every derived copy", as
       .filter((message) => ToolMessage.isInstance(message))
       .map((message) => JSON.stringify(message.content)),
   ];
-  for (const secret of ["analyst@example.com", "super-secret-token"]) {
-    for (const copy of derived) {
-      expect(copy, `derived copy leaks ${secret}`).not.toContain(secret);
-    }
+  for (const copy of derived) {
+    expect(copy, "derived copy leaks a credential").not.toContain("super-secret-token");
   }
-  expect(result.structuredResponse.summary).toContain("[REDACTED]");
   // A redacted URL keeps its shape, so the marker arrives percent-encoded.
   expect(result.structuredResponse.sources[0]?.url).toContain("%5BREDACTED%5D");
-  expect(derived.some((copy) => copy.includes("[REDACTED]"))).toBeTrue();
+  // The cited record's own contact address is public data, not operator PII.
+  expect(result.structuredResponse.summary).toContain("analyst@example.com");
 });
