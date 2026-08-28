@@ -317,8 +317,10 @@ jobs:
           mkdir -p "$RELEASE_DIRECTORY"
           # `npm pack --json` is unusable here: the package's prepack build writes to the
           # same stdout, so the captured value is not JSON. Pack into an empty directory
-          # and take the identity from the archive itself instead.
-          npm pack "$PACKAGE_DIRECTORY" --pack-destination "$RELEASE_DIRECTORY" > /dev/null
+          # and take the identity from the archive itself instead. The `./` prefix is
+          # required: npm reads a bare `packages/xnews-langgraph` as the GitHub shorthand
+          # `user/repo` and tries to clone it.
+          npm pack "./$PACKAGE_DIRECTORY" --pack-destination "$RELEASE_DIRECTORY" > /dev/null
           shopt -s nullglob
           PACKED=("$RELEASE_DIRECTORY"/*.tgz)
           if [[ "${#PACKED[@]}" -ne 1 ]]; then
