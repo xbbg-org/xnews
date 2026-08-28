@@ -42,19 +42,20 @@ function run(command: string, args: readonly string[], cwd: string): string {
 function environmentTarball(
   name: "XNEWS_CORE_TARBALL" | "XNEWS_LANGGRAPH_TARBALL",
 ): string | undefined {
-  const value = process.env[name];
-  if (value === undefined) return undefined;
+  const value = process.env[name]?.trim();
+  if (value === undefined || value.length === 0) return undefined;
   return isAbsolute(value) ? value : resolve(repositoryRoot, value);
 }
 
 async function localTarballs(workspace: string): Promise<{ core: string; companion: string }> {
   const configuredCore = environmentTarball("XNEWS_CORE_TARBALL");
   const configuredCompanion = environmentTarball("XNEWS_LANGGRAPH_TARBALL");
-  if (configuredCore !== undefined && configuredCompanion !== undefined) {
-    return { core: configuredCore, companion: configuredCompanion };
+  if (configuredCore === undefined) {
+    run("npm", ["pack", "--pack-destination", workspace], repositoryRoot);
   }
-  run("npm", ["pack", "--pack-destination", workspace], repositoryRoot);
-  run("npm", ["pack", "--pack-destination", workspace], packageRoot);
+  if (configuredCompanion === undefined) {
+    run("npm", ["pack", "--pack-destination", workspace], packageRoot);
+  }
   const entries = await readdir(workspace);
   const core =
     configuredCore ??
@@ -132,8 +133,10 @@ try {
     await writeFile(
       join(consumer, "probe.ts"),
       [
-        `import { createXnewsAnalyst, createXnewsTools, type XnewsRuntimeContext } from "@xbbg/xnews-langgraph";`,
+        `import { createXnewsAnalyst, createXnewsTools, XnewsRuntimeContextSchema, type XnewsCatalogInput, type XnewsRuntimeContext, type XnewsWorksSearchInput } from "@xbbg/xnews-langgraph";`,
         `import type { BaseChatModel } from "@langchain/core/language_models/chat_models";`,
+        `import { z as activeZod } from "zod";`,
+        `import { z as z3 } from "zod/v3";`,
         `declare const model: BaseChatModel;`,
         `const context: XnewsRuntimeContext = {`,
         `  credentials: { privateValues: ["private"] as readonly string[] },`,
@@ -143,6 +146,29 @@ try {
         `const analyst = createXnewsAnalyst({ model });`,
         `void analyst.invoke({ messages: [] }, { context });`,
         `void tools;`,
+        `const CustomContextSchema = XnewsRuntimeContextSchema.extend({ tenantLabel: z3.string() });`,
+        `const customContext: z3.input<typeof CustomContextSchema> = {`,
+        `  tenantLabel: "tenant-a",`,
+        `  credentials: { privateValues: ["private"] as readonly string[] },`,
+        `  mirrors: ["https://mirror.example"] as readonly string[],`,
+        `};`,
+        `const CustomResultSchema = activeZod.object({`,
+        `  summary: activeZod.string(),`,
+        `  claims: activeZod.array(activeZod.object({ statement: activeZod.string(), evidence: activeZod.array(activeZod.string()), confidence: activeZod.number() })),`,
+        `  sources: activeZod.array(activeZod.object({ id: activeZod.string(), title: activeZod.string().optional(), url: activeZod.string().optional(), provider: activeZod.string().optional() })),`,
+        `  uncertainty: activeZod.array(activeZod.string()),`,
+        `  limitations: activeZod.array(activeZod.string()),`,
+        `  providerDiagnostics: activeZod.array(activeZod.object({ provider: activeZod.string(), status: activeZod.enum(["ok", "empty", "unsupported", "partial", "error", "disabled"]), warningCount: activeZod.number(), errorCode: activeZod.enum(["config", "network", "http_status", "timeout", "aborted", "unknown"]).optional() })),`,
+        `  generatedAt: activeZod.string(),`,
+        `  customFinding: activeZod.string(),`,
+        `});`,
+        `const customAnalyst = createXnewsAnalyst({ model, contextSchema: CustomContextSchema, resultSchema: CustomResultSchema });`,
+        `void customAnalyst.invoke({ messages: [] }, { context: customContext }).then((state) => state.structuredResponse?.customFinding.toUpperCase());`,
+        `const worksInput: XnewsWorksSearchInput = { operation: "search", source: "works", query: "rates" };`,
+        `// @ts-expect-error a present selector cannot be undefined`,
+        `const invalidWorksInput: XnewsWorksSearchInput = { operation: "search", source: "works", query: undefined };`,
+        `const catalogInput: XnewsCatalogInput = { operation: "providers", seam: undefined };`,
+        `void worksInput; void invalidWorksInput; void catalogInput;`,
       ].join("\n"),
     );
     run("npx", ["--no-install", "tsc", "-p", "tsconfig.json"], consumer);

@@ -216,6 +216,7 @@ jobs:
 
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
+
       - name: Link the local core workspace into the companion
         if: needs.release-metadata.outputs.package_id == 'langgraph'
         run: bun install --cwd packages/xnews-langgraph --frozen-lockfile
@@ -243,11 +244,6 @@ jobs:
         env:
           QUALITY_COMMAND: ${{ needs.release-metadata.outputs.quality_command }}
         run: bun run "$QUALITY_COMMAND"
-
-      - name: Smoke test selected packaged install
-        env:
-          SMOKE_COMMAND: ${{ needs.release-metadata.outputs.smoke_command }}
-        run: bun run "$SMOKE_COMMAND"
 
       - name: Check registry idempotency and bootstrap eligibility
         id: registry
@@ -314,6 +310,8 @@ jobs:
         env:
           CHANGELOG_PATH: ${{ needs.release-metadata.outputs.changelog }}
           PACKAGE_DIRECTORY: ${{ needs.release-metadata.outputs.directory }}
+          EXPECTED_NAME: ${{ needs.release-metadata.outputs.package_name }}
+          EXPECTED_VERSION: ${{ needs.release-metadata.outputs.version }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
         shell: bash
         run: |
@@ -321,12 +319,27 @@ jobs:
           RELEASE_DIRECTORY="${RUNNER_TEMP}/npm-release"
           mkdir -p "$RELEASE_DIRECTORY"
           PACK_JSON="$(npm pack "$PACKAGE_DIRECTORY" --json --pack-destination "$RELEASE_DIRECTORY")"
-          PACKED_FILENAME="$(PACK_JSON="$PACK_JSON" node --input-type=module -e 'const rows = JSON.parse(process.env.PACK_JSON); if (rows.length !== 1 || typeof rows[0].filename !== "string") throw new Error("npm pack did not return one tarball"); process.stdout.write(rows[0].filename)')"
+          PACKED_FILENAME="$(PACK_JSON="$PACK_JSON" EXPECTED_NAME="$EXPECTED_NAME" EXPECTED_VERSION="$EXPECTED_VERSION" node --input-type=module -e 'const rows = JSON.parse(process.env.PACK_JSON); if (rows.length !== 1 || typeof rows[0].filename !== "string") throw new Error("npm pack did not return one tarball"); if (rows[0].name !== process.env.EXPECTED_NAME || rows[0].version !== process.env.EXPECTED_VERSION) throw new Error(`packed identity ${rows[0].name}@${rows[0].version} does not match ${process.env.EXPECTED_NAME}@${process.env.EXPECTED_VERSION}`); process.stdout.write(rows[0].filename)')"
           mv "${RELEASE_DIRECTORY}/${PACKED_FILENAME}" "${RELEASE_DIRECTORY}/package.tgz"
           PACKAGE_SHA256="$(sha256sum "${RELEASE_DIRECTORY}/package.tgz" | cut -d ' ' -f 1)"
           printf '%s  package.tgz\n' "$PACKAGE_SHA256" > "${RELEASE_DIRECTORY}/SHA256SUMS"
           bun run ./scripts/changelog.ts section "$CHANGELOG_PATH" "$VERSION" > "${RELEASE_DIRECTORY}/notes.md"
           echo "package_sha256=$PACKAGE_SHA256" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the exact packed archive
+        env:
+          PACKAGE_ID: ${{ needs.release-metadata.outputs.package_id }}
+          SMOKE_COMMAND: ${{ needs.release-metadata.outputs.smoke_command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_TARBALL="${RUNNER_TEMP}/npm-release/package.tgz"
+          if [[ "$PACKAGE_ID" == "core" ]]; then
+            export XNEWS_CORE_TARBALL="$PACKAGE_TARBALL"
+          else
+            export XNEWS_LANGGRAPH_TARBALL="$PACKAGE_TARBALL"
+          fi
+          bun run "$SMOKE_COMMAND"
+          (cd "${RUNNER_TEMP}/npm-release" && sha256sum --check SHA256SUMS)
 
       - name: Upload immutable release inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

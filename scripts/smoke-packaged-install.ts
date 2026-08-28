@@ -9,10 +9,11 @@
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const configuredTarball = process.env["XNEWS_CORE_TARBALL"]?.trim();
 
 function run(command: string, args: string[], cwd: string): string {
   const result = spawnSync(command, args, {
@@ -31,11 +32,19 @@ const workspace = await mkdtemp(join(tmpdir(), "xnews-packed-"));
 let failure: unknown;
 
 try {
-  console.log("packing tarball...");
-  run("npm", ["pack", "--pack-destination", workspace], packageRoot);
-  const tarball = (await readdir(workspace)).find((entry) => entry.endsWith(".tgz"));
-  if (!tarball) throw new Error("npm pack produced no tarball");
-  console.log(`packed ${tarball}`);
+  let tarballPath: string;
+  if (configuredTarball !== undefined && configuredTarball.length > 0) {
+    tarballPath = isAbsolute(configuredTarball)
+      ? configuredTarball
+      : resolve(packageRoot, configuredTarball);
+  } else {
+    console.log("packing tarball...");
+    run("npm", ["pack", "--pack-destination", workspace], packageRoot);
+    const tarball = (await readdir(workspace)).find((entry) => entry.endsWith(".tgz"));
+    if (!tarball) throw new Error("npm pack produced no tarball");
+    tarballPath = join(workspace, tarball);
+    console.log(`packed ${tarball}`);
+  }
 
   run("npm", ["init", "-y"], workspace);
   await writeFile(
@@ -43,7 +52,7 @@ try {
     `${JSON.stringify({ name: "xnews-packed-consumer", private: true, type: "module" }, null, 2)}\n`,
   );
   console.log("installing tarball into throwaway project...");
-  run("npm", ["install", "--no-audit", "--no-fund", join(workspace, tarball)], workspace);
+  run("npm", ["install", "--no-audit", "--no-fund", tarballPath], workspace);
 
   // Consume through the package name so export maps are exercised, not file paths.
   const probe = join(workspace, "probe.mjs");
