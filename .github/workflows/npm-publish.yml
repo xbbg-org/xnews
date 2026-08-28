@@ -313,10 +313,21 @@ jobs:
         run: |
           set -euo pipefail
           RELEASE_DIRECTORY="${RUNNER_TEMP}/npm-release"
+          rm -rf "$RELEASE_DIRECTORY"
           mkdir -p "$RELEASE_DIRECTORY"
-          PACK_JSON="$(npm pack "$PACKAGE_DIRECTORY" --json --pack-destination "$RELEASE_DIRECTORY")"
-          PACKED_FILENAME="$(PACK_JSON="$PACK_JSON" EXPECTED_NAME="$EXPECTED_NAME" EXPECTED_VERSION="$EXPECTED_VERSION" node --input-type=module -e 'const rows = JSON.parse(process.env.PACK_JSON); if (rows.length !== 1 || typeof rows[0].filename !== "string") throw new Error("npm pack did not return one tarball"); if (rows[0].name !== process.env.EXPECTED_NAME || rows[0].version !== process.env.EXPECTED_VERSION) throw new Error(`packed identity ${rows[0].name}@${rows[0].version} does not match ${process.env.EXPECTED_NAME}@${process.env.EXPECTED_VERSION}`); process.stdout.write(rows[0].filename)')"
-          mv "${RELEASE_DIRECTORY}/${PACKED_FILENAME}" "${RELEASE_DIRECTORY}/package.tgz"
+          # `npm pack --json` is unusable here: the package's prepack build writes to the
+          # same stdout, so the captured value is not JSON. Pack into an empty directory
+          # and take the identity from the archive itself instead.
+          npm pack "$PACKAGE_DIRECTORY" --pack-destination "$RELEASE_DIRECTORY" > /dev/null
+          shopt -s nullglob
+          PACKED=("$RELEASE_DIRECTORY"/*.tgz)
+          if [[ "${#PACKED[@]}" -ne 1 ]]; then
+            echo "::error::npm pack produced ${#PACKED[@]} tarballs, expected exactly one"
+            exit 1
+          fi
+          mv "${PACKED[0]}" "${RELEASE_DIRECTORY}/package.tgz"
+          PACKED_MANIFEST="$(tar -xOf "${RELEASE_DIRECTORY}/package.tgz" package/package.json)"
+          PACKED_MANIFEST="$PACKED_MANIFEST" EXPECTED_NAME="$EXPECTED_NAME" EXPECTED_VERSION="$EXPECTED_VERSION" node --input-type=module -e 'const manifest = JSON.parse(process.env.PACKED_MANIFEST); if (manifest.name !== process.env.EXPECTED_NAME || manifest.version !== process.env.EXPECTED_VERSION) throw new Error(`packed identity ${manifest.name}@${manifest.version} does not match ${process.env.EXPECTED_NAME}@${process.env.EXPECTED_VERSION}`)'
           PACKAGE_SHA256="$(sha256sum "${RELEASE_DIRECTORY}/package.tgz" | cut -d ' ' -f 1)"
           printf '%s  package.tgz\n' "$PACKAGE_SHA256" > "${RELEASE_DIRECTORY}/SHA256SUMS"
           bun run ./scripts/changelog.ts section "$CHANGELOG_PATH" "$VERSION" > "${RELEASE_DIRECTORY}/notes.md"
