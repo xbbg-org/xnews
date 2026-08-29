@@ -15,6 +15,7 @@ import { promoteUnreleased, releaseNotes } from "./changelog.js";
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const STABLE_SEMVER = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/;
 const RELEASE_BRANCH = "main";
+const LOCKFILE_PATH = "bun.lock";
 
 export type ReleasePackageId = "core" | "langgraph";
 
@@ -276,7 +277,17 @@ export async function release(
   await io.writeText(releasePackage.manifestPath, updatedManifest);
   await io.writeText(releasePackage.changelogPath, promoted);
 
-  io.run("git", ["add", "--", releasePackage.manifestPath, releasePackage.changelogPath]);
+  // The workspace lockfile records each package's version and peer ranges, so a release
+  // commit that bumps a manifest without it fails CI's `--frozen-lockfile` install before
+  // anything is published.
+  io.run("bun", ["install", "--ignore-scripts"]);
+  io.run("git", [
+    "add",
+    "--",
+    releasePackage.manifestPath,
+    releasePackage.changelogPath,
+    LOCKFILE_PATH,
+  ]);
   const commitSubject =
     releasePackage.id === "core"
       ? `chore(release): ${version}`

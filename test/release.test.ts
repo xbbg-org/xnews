@@ -185,6 +185,12 @@ test("companion release gates and stages only companion files", async () => {
   expect(harness.writes.get("packages/xnews-langgraph/CHANGELOG.md")).toContain(
     `[Unreleased]: ${REPOSITORY}/compare/xnews-langgraph-v0.1.1...HEAD`,
   );
+  // The lockfile records the companion's version and peer ranges; a release commit without
+  // it fails CI's frozen-lockfile install before anything is published.
+  expect(harness.commands).toContainEqual({
+    command: "bun",
+    args: ["install", "--ignore-scripts"],
+  });
   expect(harness.commands).toContainEqual({
     command: "git",
     args: [
@@ -192,6 +198,7 @@ test("companion release gates and stages only companion files", async () => {
       "--",
       "packages/xnews-langgraph/package.json",
       "packages/xnews-langgraph/CHANGELOG.md",
+      "bun.lock",
     ],
   });
   expect(harness.commands).toContainEqual({

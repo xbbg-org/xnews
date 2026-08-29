@@ -32,7 +32,6 @@ test("root remains a publishable zero-runtime-dependency workspace package", asy
   expect(companion).toMatchObject({
     name: "@xbbg/xnews-langgraph",
     peerDependencies: {
-      "@xbbg/xnews": "^0.2.0",
       "@langchain/core": "^1.2.9",
       "@langchain/langgraph": "^1.4.12",
       langchain: "^1.5.10",
@@ -40,6 +39,23 @@ test("root remains a publishable zero-runtime-dependency workspace package", asy
     },
     devDependencies: { "@xbbg/xnews": "file:../.." },
   });
+
+  // The two packages share a version line, so the companion's core range must admit the
+  // core in this checkout. A literal range would go stale between the two release commits.
+  const coreVersion = isRecord(root) ? root["version"] : undefined;
+  const peers = isRecord(companion) ? companion["peerDependencies"] : undefined;
+  const coreRange = isRecord(peers) ? peers["@xbbg/xnews"] : undefined;
+  if (typeof coreVersion !== "string" || typeof coreRange !== "string") {
+    throw new Error("both manifests must declare the core version and range");
+  }
+  const core = coreVersion.split(".").map(Number);
+  const floor = coreRange.replace(/^\^/u, "").split(".").map(Number);
+  expect(coreRange.startsWith("^"), `${coreRange} must be a caret range`).toBeTrue();
+  expect([core[0], core[1]], `${coreRange} must track the core minor`).toEqual([
+    floor[0],
+    floor[1],
+  ]);
+  expect(core[2]).toBeGreaterThanOrEqual(floor[2] ?? 0);
   expect(companion).not.toHaveProperty("dependencies");
 
   // Same snapshot hazard as CI: any script that both builds core and re-links it
