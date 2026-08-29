@@ -4,6 +4,8 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-28
+
 ### Changed
 
 - The companion now shares the core's version line: `@xbbg/xnews-langgraph` and `@xbbg/xnews` are released at the same version, and the `@xbbg/xnews` peer range is the version they ship together (`^0.2.1`). The jump from `0.1.0` to `0.2.1` is that alignment, not a change in scope.
@@ -26,5 +28,6 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 - Public Zod 3.25.76 and Zod 4.2.0 compatible schemas, stable TypeScript types, and exhaustive capability registries.
 - Exact-floor packaged-install smoke coverage for both supported Zod majors.
 
-[Unreleased]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.1.0...HEAD
+[Unreleased]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.2.1...HEAD
+[0.2.1]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.1.0...xnews-langgraph-v0.2.1
 [0.1.0]: https://github.com/xbbg-org/xnews/releases/tag/xnews-langgraph-v0.1.0
