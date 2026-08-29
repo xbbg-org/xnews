@@ -19,6 +19,7 @@ import {
   type XnewsByteArtifact,
 } from "../src/index.js";
 import { requireRuntimeContext, runtimeSecretValues } from "../src/context.js";
+import { isSensitiveDataKey } from "../src/credential-keys.js";
 import type { XnewsAnalyst, XnewsRuntimeContext } from "../src/index.js";
 import { isRecord } from "../src/type-guards.js";
 
@@ -330,4 +331,39 @@ test("only credential values from the OCR config become redaction patterns", () 
 
   expect(redactText("database rows and base rates", secrets)).toBe("database rows and base rates");
   expect(redactText("sent ocr-secret-value upstream", secrets)).toBe("sent [REDACTED] upstream");
+});
+
+// Substring matching treated `secretary` and `tokenCount` as credentials and blanked those
+// record fields; only a name whose last word is a credential word qualifies.
+test("credential field names are matched by word, not by substring", () => {
+  for (const key of [
+    "apiKey",
+    "api_key",
+    "x-api-key",
+    "accessToken",
+    "access_token",
+    "clientSecret",
+    "authorization",
+    "cookie",
+    "sessionToken",
+    "credentials",
+  ]) {
+    expect(isSensitiveDataKey(key), `${key} is a credential`).toBeTrue();
+  }
+  for (const key of [
+    "secretary",
+    "secretaryName",
+    "tokenCount",
+    "tokenizer",
+    "sessionTitle",
+    "cookieBanner",
+    "credentialsPolicy",
+    "passwordless",
+    "keyword",
+    "email",
+    "contact",
+    "userAgent",
+  ]) {
+    expect(isSensitiveDataKey(key), `${key} is record data`).toBeFalse();
+  }
 });

@@ -22,7 +22,8 @@ import {
   sourceFetchOptions,
   type XnewsRuntimeContext,
 } from "../context.js";
-import { isSensitiveDataKey, redactText } from "../digest.js";
+import { isSensitiveDataKey } from "../credential-keys.js";
+import { redactText } from "../digest.js";
 import { isRecord } from "../type-guards.js";
 
 const DEFAULT_MAX_SEEN_IDS = 10_000;

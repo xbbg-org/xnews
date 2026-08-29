@@ -8,19 +8,11 @@ import {
   type XnewsRuntimeContext,
   type XnewsToolOptions,
 } from "./context.js";
+import { isSensitiveDataKey } from "./credential-keys.js";
 import type { XnewsToolName } from "./registry.js";
 import { isRecord } from "./type-guards.js";
 
 const REDACTED = "[REDACTED]";
-// Operator-owned credential keys only. Upstream payloads legitimately carry fields such as
-// `email`, `phone`, `contact`, or `userAgent`, and blanking those by name destroys public
-// record data without protecting the operator: every operator value the host supplied is
-// redacted by value through `runtimeSecretValues`.
-const SENSITIVE_KEY = /(?:api.?key|authorization|bearer|cookie|credential|password|secret|token)/i;
-export function isSensitiveDataKey(key: string): boolean {
-  return SENSITIVE_KEY.test(key);
-}
-
 // A capability URL carries its secret in a credential-named query parameter. Path segments
 // are public routing — a Google News article id or a Federal Register slug — and a
 // host-supplied URL is already covered by value.
@@ -352,10 +344,9 @@ function summarizeValue(value: unknown, secrets: readonly string[], depth = 0): 
   const keys = Object.keys(value).toSorted().slice(0, MAX_SUMMARY_KEYS);
   for (const key of keys) {
     const redactedKey = redactText(key, secrets);
-    const outputKey = SENSITIVE_KEY.test(key) || redactedKey !== key ? REDACTED : key;
-    result[outputKey] = SENSITIVE_KEY.test(key)
-      ? REDACTED
-      : summarizeValue(value[key], secrets, depth + 1);
+    const sensitive = isSensitiveDataKey(key);
+    const outputKey = sensitive || redactedKey !== key ? REDACTED : key;
+    result[outputKey] = sensitive ? REDACTED : summarizeValue(value[key], secrets, depth + 1);
   }
   const omittedKeys = Object.keys(value).length - keys.length;
   if (omittedKeys > 0) result["omittedKeys"] = omittedKeys;

@@ -9,6 +9,7 @@ import type {
 } from "@xbbg/xnews";
 import { z } from "zod/v3";
 
+import { isSensitiveDataKey } from "./credential-keys.js";
 import { isRecord } from "./type-guards.js";
 
 type XnewsSourceFetch = NonNullable<SourceFetchOptions["fetch"]>;
@@ -72,8 +73,6 @@ export interface XnewsToolOptions {
 export const DEFAULT_XNEWS_ARTIFACT_BYTE_CAP = 8 * 1024 * 1024;
 const RuntimeEmail = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
 const RuntimePhoneCandidate = /(?<![\w])(?:\+?\d[\d().\s-]{5,}\d)(?![\w])/gu;
-const CREDENTIAL_KEY =
-  /(?:api.?key|authorization|bearer|cookie|credential|password|secret|session|token)/i;
 
 const RuntimeString = z.string().min(1).max(8_192);
 const RuntimeNonnegativeInteger = z.number().int().nonnegative();
@@ -314,7 +313,7 @@ export function runtimeSecretValues(context: XnewsRuntimeContext): readonly stri
       } catch {
         continue;
       }
-      addCredentialStrings(item, credential || CREDENTIAL_KEY.test(key), depth + 1);
+      addCredentialStrings(item, credential || isSensitiveDataKey(key), depth + 1);
     }
   };
   const addOperatorValue = (value: string | undefined): void => {
