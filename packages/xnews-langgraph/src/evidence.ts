@@ -43,6 +43,8 @@ export function collectXnewsEvidence(
   // yields two records sharing `provider|guid`. Keeping the first would cite the wrong one while
   // looking exact, so a contested prefix is dropped and its citation reads as unresolved.
   const prefixOwners = new Map<string, Set<string>>();
+  // A ref is a hash of the item id, so one ref naming two ids means a collision, not a record.
+  const refOwners = new Map<string, Set<string>>();
 
   for (const message of messages) {
     if (!ToolMessage.isInstance(message) || typeof message.content !== "string") continue;
@@ -70,6 +72,9 @@ export function collectXnewsEvidence(
         tool: stringField(digest, "tool"),
       };
       // The ref and the full id identify one record; both are exact.
+      const refIds = refOwners.get(entry.ref) ?? new Set<string>();
+      refIds.add(id);
+      refOwners.set(entry.ref, refIds);
       for (const key of [entry.ref, id]) {
         if (key.length > 0 && !evidence.has(key)) evidence.set(key, entry);
       }
@@ -86,6 +91,9 @@ export function collectXnewsEvidence(
     // An exact id equal to this prefix keeps its own record; only the guess is dropped.
     const claimed = evidence.get(prefix);
     if (owners.size > 1 && claimed !== undefined && claimed.id !== prefix) evidence.delete(prefix);
+  }
+  for (const [ref, ids] of refOwners) {
+    if (ids.size > 1) evidence.delete(ref);
   }
   return evidence;
 }

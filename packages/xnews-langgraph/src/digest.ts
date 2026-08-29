@@ -116,13 +116,19 @@ function withCitationRef(raw: unknown, summarized: unknown): unknown {
   if (!isRecord(summarized)) return summarized;
   const id = isRecord(raw) ? raw["id"] : undefined;
   if (typeof id !== "string" || id.length === 0) return summarized;
-  if (typeof summarized["ref"] === "string") return summarized;
+  // `ref` is reserved. An upstream record carrying its own `ref` would otherwise choose the handle
+  // a citation resolves through, and provider payloads are attacker-influenced.
   return { ...summarized, ref: citationRef(id) };
 }
 
-/** The handle a host resolves a citation with; recomputable from any item id. */
+/**
+ * The handle a host resolves a citation with; recomputable from any item id.
+ *
+ * 96 bits, not the 48 a shorter prefix would give: provider content is attacker-influenced, and
+ * grinding a 48-bit collision to make one item resolve as another is roughly 2^24 work.
+ */
 export function citationRef(id: string): string {
-  return createHash("sha256").update(id).digest("hex").slice(0, 12);
+  return createHash("sha256").update(id).digest("hex").slice(0, 24);
 }
 
 export function createXnewsToolOutput(

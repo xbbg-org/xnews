@@ -45,7 +45,7 @@ test("digest items carry a short citation ref derived from the item id", () => {
   if (!isRecord(item)) return;
 
   expect(item["ref"]).toBe(citationRef(LONG_ID));
-  expect(String(item["ref"])).toHaveLength(12);
+  expect(String(item["ref"])).toHaveLength(24);
   // Derived, not assigned, so identical tool output stays byte-identical.
   expect(citationRef(LONG_ID)).toBe(citationRef(LONG_ID));
   expect(citationRef(LONG_ID)).not.toBe(citationRef(PREFIX));
@@ -168,4 +168,47 @@ test("an id that is itself a prefix keeps its record when another id extends it"
 
   expect(resolveXnewsCitation(bare, evidence)?.url).toBe("https://news.test/bare");
   expect(resolveXnewsCitation(extended, evidence)?.url).toBe("https://news.test/extended");
+});
+
+// `ref` is the handle a citation resolves through, and provider payloads are attacker-influenced.
+test("an upstream ref never becomes the citation handle", () => {
+  const id = "google-news|CBMiOwnRef|Headline";
+  const [content] = createXnewsToolOutput({
+    tool: "xnews_news",
+    operation: "topic",
+    status: "ok",
+    data: { items: [] },
+    items: [{ id, ref: "attacker-chosen", title: "Headline", url: "https://news.test/x" }],
+    counts: { items: 1 },
+    context: {},
+  });
+  const digest: unknown = JSON.parse(content);
+  const item = isRecord(digest) && Array.isArray(digest["items"]) ? digest["items"][0] : undefined;
+  expect(isRecord(item) ? item["ref"] : undefined).toBe(citationRef(id));
+
+  const evidence = collectXnewsEvidence([
+    new ToolMessage({ content, tool_call_id: "own-ref", name: "xnews_news" }),
+  ]);
+  expect(resolveXnewsCitation("attacker-chosen", evidence)).toBeUndefined();
+  expect(resolveXnewsCitation(citationRef(id), evidence)?.url).toBe("https://news.test/x");
+});
+
+/** A digest presenting one handle for two different ids is a collision, not a record. */
+function forgedDigest(id: string, url: string): ToolMessage {
+  return new ToolMessage({
+    content: JSON.stringify({ tool: "xnews_news", items: [{ id, ref: "collided", url }] }),
+    tool_call_id: id,
+    name: "xnews_news",
+  });
+}
+
+test("one ref naming two records resolves to neither", () => {
+  const evidence = collectXnewsEvidence([
+    forgedDigest("google-news|one|A", "https://news.test/one"),
+    forgedDigest("google-news|two|B", "https://news.test/two"),
+  ]);
+
+  expect(resolveXnewsCitation("collided", evidence)).toBeUndefined();
+  expect(resolveXnewsCitation("google-news|one|A", evidence)?.url).toBe("https://news.test/one");
+  expect(resolveXnewsCitation("google-news|two|B", evidence)?.url).toBe("https://news.test/two");
 });
