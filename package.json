@@ -1,6 +1,6 @@
 {
   "name": "@xbbg/xnews",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Fetch, parse, and normalize market news, research papers, central-bank publications, and structured economic data from public feeds and APIs, with YouTube captions and transcription.",
   "keywords": [
     "arxiv",
