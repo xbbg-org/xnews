@@ -62,7 +62,7 @@ export function collectXnewsEvidence(
 
     for (const item of items) {
       if (!isRecord(item)) continue;
-      const id = stringField(item, "id");
+      const id = stringField(item, "id") ?? stringField(item, "sourceId");
       if (id === undefined) continue;
       const tool = stringField(digest, "tool");
       const provider = stringField(item, "provider");

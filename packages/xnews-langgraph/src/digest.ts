@@ -122,7 +122,10 @@ export interface XnewsCitationScope {
  */
 function withCitationRef(tool: string, raw: unknown, summarized: unknown): unknown {
   if (!isRecord(summarized)) return summarized;
-  const id = isRecord(raw) ? raw["id"] : undefined;
+  // `WorkRecord` names its provider-native identifier `sourceId`; events and news items use `id`.
+  // A row with neither — a data release row, an extracted page — has no stable identity to hash,
+  // and inventing one from its contents would change the handle whenever the provider did.
+  const id = isRecord(raw) ? (raw["id"] ?? raw["sourceId"]) : undefined;
   if (typeof id !== "string" || id.length === 0) return summarized;
   const provider = isRecord(raw) ? raw["provider"] : undefined;
   // `ref` is reserved. An upstream record carrying its own `ref` would otherwise choose the handle

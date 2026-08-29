@@ -256,3 +256,47 @@ test("two providers reporting the same id get distinct handles", () => {
   // The bare id names neither record, so it must not answer for one of them.
   expect(resolveXnewsCitation("1", evidence)).toBeUndefined();
 });
+
+// Not every record shape has an `id`. A works record names its identifier `sourceId`, and a data
+// release row has no stable identity at all — inventing one would change the handle whenever the
+// provider changed a column.
+test("refs follow the identifier a record actually has", () => {
+  const [worksContent] = createXnewsToolOutput({
+    tool: "xnews_works",
+    operation: "search",
+    status: "ok",
+    data: { items: [] },
+    items: [{ sourceId: "openlibrary:OL123M", provider: "openlibrary", title: "A Work" }],
+    counts: { items: 1 },
+    context: {},
+  });
+  const worksDigest: unknown = JSON.parse(worksContent);
+  const work =
+    isRecord(worksDigest) && Array.isArray(worksDigest["items"])
+      ? worksDigest["items"][0]
+      : undefined;
+  expect(isRecord(work) ? work["ref"] : undefined).toBe(
+    citationRef({ tool: "xnews_works", provider: "openlibrary", id: "openlibrary:OL123M" }),
+  );
+  const worksEvidence = collectXnewsEvidence([
+    new ToolMessage({ content: worksContent, tool_call_id: "works", name: "xnews_works" }),
+  ]);
+  expect(resolveXnewsCitation("openlibrary:OL123M", worksEvidence)?.title).toBe("A Work");
+
+  const [rowContent] = createXnewsToolOutput({
+    tool: "xnews_data",
+    operation: "fetch",
+    status: "ok",
+    data: { release: { rows: [] } },
+    items: [{ market: "wheat", netPosition: 1234 }],
+    counts: { rows: 1 },
+    context: {},
+  });
+  const rowDigest: unknown = JSON.parse(rowContent);
+  const row =
+    isRecord(rowDigest) && Array.isArray(rowDigest["items"]) ? rowDigest["items"][0] : undefined;
+  expect(isRecord(row)).toBeTrue();
+  // No stable identity, so no handle is invented and the row is still reported in full.
+  expect(isRecord(row) ? row["ref"] : "missing").toBeUndefined();
+  expect(isRecord(row) ? row["market"] : undefined).toBe("wheat");
+});

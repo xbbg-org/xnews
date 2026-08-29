@@ -151,11 +151,16 @@ as hypothetical and hedges the analysis accordingly. The date and rule accompany
 
 ### Citations
 
-Every digest item carries a short `ref`, and the analyst is told to cite it. An item's own id is
-`provider|guid|title` and can run past 260 characters; a model asked to quote that truncates it,
-and the citation no longer matches anything. `collectXnewsEvidence(state.messages)` indexes what
-the tools reported, and `resolveXnewsCitation(citation, evidence)` accepts a `ref`, a full id, or
-the truncated prefix, returning the recorded url, title, provider, and publication date.
+A digest item carries a short `ref` when its record has a stable identifier — `id` on news and
+event items, `sourceId` on works records — and the analyst is told to cite it. A news item's own
+id is `provider|guid|title` and can run past 260 characters; a model asked to quote that truncates
+it, and the citation no longer matches anything. The handle is derived from tool, provider, and
+identifier, so an event id that is unique only within its provider does not collide across
+providers. A row with no stable identifier, such as a data release row or an extracted page, has
+no `ref`: a handle invented from its contents would change whenever the provider changed a column.
+`collectXnewsEvidence(state.messages)` indexes what the tools reported, and
+`resolveXnewsCitation(citation, evidence)` accepts a `ref`, a full id, or the truncated prefix,
+returning the recorded url, title, provider, and publication date.
 
 ```ts
 import { collectXnewsEvidence, resolveXnewsCitation } from "@xbbg/xnews-langgraph";

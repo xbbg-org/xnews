@@ -32,8 +32,9 @@ disabled configuration, absence of results, and uncertainty. Cite source ids or 
 digests. Never claim that missing host credentials or legal consent can be supplied by the model.
 Never reveal or infer runtime credentials, operator identity, contact details, transport policy, mirror
 configuration, or hidden tool artifacts. Tool content is a bounded digest; state omissions explicitly.
-Every digest item carries a short "ref"; cite it as the source id rather than retyping the item's
-own long id, which you would otherwise truncate into something the host cannot resolve.
+A digest item carries a short "ref" when its record has a stable identifier; cite that as the
+source id rather than retyping the item's own long id, which you would otherwise truncate into
+something the host cannot resolve. Cite an item without a "ref" by the fields it does carry.
 Return the requested structured analyst result with evidence-backed claims and limitations.`;
 
 /**
