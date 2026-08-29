@@ -162,7 +162,10 @@ test("runtime context validation is generic and secret traversal is cycle-bounde
   expect(String(invalidError)).toBe("TypeError: Invalid xnews runtime context");
   expect(String(invalidError)).not.toContain("operator-private-value");
 
-  const extraBody: Record<string, unknown> = { privateFragment: "nested-private-value" };
+  const extraBody: Record<string, unknown> = {
+    apiKey: "nested-private-value",
+    imageHint: "nested-public-value",
+  };
   extraBody["self"] = extraBody;
   const context = requireRuntimeContext({
     credentials: { privateValues: ["readonly-private-value"] as readonly string[] },
@@ -171,6 +174,8 @@ test("runtime context validation is generic and secret traversal is cycle-bounde
   });
   expect(runtimeSecretValues(context)).toContain("nested-private-value");
   expect(runtimeSecretValues(context)).toContain("readonly-private-value");
+  // Settings that are not credentials must not become redaction patterns.
+  expect(runtimeSecretValues(context)).not.toContain("nested-public-value");
   expect(typeof invokeWithRuntimeContext).toBe("function");
   expect(typeof invokeWithCustomContext).toBe("function");
 });
@@ -299,4 +304,30 @@ test("redaction covers operator values and leaves public content intact", () => 
   );
   expect(embedded).not.toContain("secret-value");
   expect(embedded).not.toContain("abc.def");
+});
+
+// An OCR runtime config is mostly ordinary settings. Treating every nested string as a
+// secret made short values such as `imageMode: "base"` rewrite public text.
+test("only credential values from the OCR config become redaction patterns", () => {
+  const secrets = runtimeSecretValues({
+    ocr: {
+      baseUrl: "https://ocr.internal.test",
+      apiKey: "ocr-secret-value",
+      model: "Unlimited-OCR",
+      imageMode: "base",
+      prompt: "describe",
+      extraBody: { access_token: "extra-secret-value", mode: "fast" },
+    },
+  });
+
+  expect(secrets).toContain("ocr-secret-value");
+  expect(secrets).toContain("https://ocr.internal.test");
+  expect(secrets).toContain("extra-secret-value");
+  expect(secrets).not.toContain("base");
+  expect(secrets).not.toContain("Unlimited-OCR");
+  expect(secrets).not.toContain("describe");
+  expect(secrets).not.toContain("fast");
+
+  expect(redactText("database rows and base rates", secrets)).toBe("database rows and base rates");
+  expect(redactText("sent ocr-secret-value upstream", secrets)).toBe("sent [REDACTED] upstream");
 });

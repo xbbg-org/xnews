@@ -4,6 +4,10 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Runtime-secret collection no longer turns ordinary OCR settings into redaction patterns. Every nested string under `context.ocr` was treated as a secret, so an `imageMode` of `"base"` rewrote the word "database" in public provider text and a `model` of `"Unlimited-OCR"` would blank the model name wherever it appeared. Only `ocr.apiKey`, `ocr.baseUrl`, and values under credential-named keys inside `ocr.extraBody` are collected now; `0.2.1` shipped with the wider collection.
+
 ## [0.2.1] - 2026-08-28
 
 ### Changed

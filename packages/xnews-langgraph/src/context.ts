@@ -72,6 +72,8 @@ export interface XnewsToolOptions {
 export const DEFAULT_XNEWS_ARTIFACT_BYTE_CAP = 8 * 1024 * 1024;
 const RuntimeEmail = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
 const RuntimePhoneCandidate = /(?<![\w])(?:\+?\d[\d().\s-]{5,}\d)(?![\w])/gu;
+const CREDENTIAL_KEY =
+  /(?:api.?key|authorization|bearer|cookie|credential|password|secret|session|token)/i;
 
 const RuntimeString = z.string().min(1).max(8_192);
 const RuntimeNonnegativeInteger = z.number().int().nonnegative();
@@ -293,11 +295,14 @@ export function runtimeSecretValues(context: XnewsRuntimeContext): readonly stri
   const add = (value: string | undefined): void => {
     if (value !== undefined && value.length > 0) values.add(value);
   };
-  const addNestedStrings = (value: unknown, depth = 0): void => {
+  // Only values under a credential-named key are secrets. Collecting every nested string
+  // turned ordinary configuration into a redaction pattern: an `imageMode` of `"base"`
+  // rewrote the word "database" in public provider text.
+  const addCredentialStrings = (value: unknown, credential: boolean, depth = 0): void => {
     if (remainingNestedValues <= 0 || depth > 8) return;
     remainingNestedValues -= 1;
     if (typeof value === "string") {
-      add(value);
+      if (credential) add(value);
       return;
     }
     if (typeof value !== "object" || value === null || visited.has(value)) return;
@@ -309,7 +314,7 @@ export function runtimeSecretValues(context: XnewsRuntimeContext): readonly stri
       } catch {
         continue;
       }
-      addNestedStrings(item, depth + 1);
+      addCredentialStrings(item, credential || CREDENTIAL_KEY.test(key), depth + 1);
     }
   };
   const addOperatorValue = (value: string | undefined): void => {
@@ -328,7 +333,9 @@ export function runtimeSecretValues(context: XnewsRuntimeContext): readonly stri
   add(context.credentials?.annasArchiveKey);
   for (const value of context.credentials?.privateValues ?? []) add(value);
   for (const value of Object.values(context.credentials?.byProvider ?? {})) add(value);
-  addNestedStrings(context.ocr);
+  add(context.ocr?.apiKey);
+  add(context.ocr?.baseUrl);
+  addCredentialStrings(context.ocr?.extraBody, false);
   for (const value of context.mirrors ?? []) add(value);
   return [...values].toSorted(
     (left, right) => right.length - left.length || left.localeCompare(right),
