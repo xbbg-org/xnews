@@ -127,6 +127,9 @@ export function createXnewsAnalyst(
   });
   strategy.parse = (toolArgs: Record<string, unknown>): Record<string, unknown> => ({
     ...interopParse(resultSchema, toolArgs),
+    // A timestamp is not something a model can know. Left to the model, it reports its
+    // training era: two of three providers dated a live 2026 result to 2024.
+    generatedAt: new Date().toISOString(),
   });
 
   return createAgent({

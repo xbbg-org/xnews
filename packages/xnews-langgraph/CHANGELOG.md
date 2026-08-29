@@ -7,6 +7,7 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 ### Fixed
 
 - Credential field names are matched by word instead of by substring. `secretary`, `tokenCount`, `cookieBanner`, and `credentialsPolicy` were treated as credentials and blanked in digests, artifacts, and node state; a name now qualifies only when its last word is a credential word, so `apiKey`, `access_token`, and `clientSecret` still match.
+- `structuredResponse.generatedAt` is stamped by the runtime when the result is parsed instead of being taken from the model. Asked for a result over live 2026 articles, two of three providers dated it to 2024 and one flagged the current articles as "predictive or speculative" — a model reports its training era, not the clock.
 
 ## [0.2.2] - 2026-08-29
 

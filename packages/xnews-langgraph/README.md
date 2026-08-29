@@ -138,6 +138,10 @@ while the built-in tools parse only the allowlisted runtime fields. A custom res
 retain the `XnewsAnalystResult` contract and is responsible for equivalent PII and URL redaction.
 The package chooses no persistence backend.
 
+`generatedAt` is stamped by the runtime when the result is parsed; the model's value is
+discarded. A model reports its training era rather than the clock, and dating an analysis
+two years into the past silently corrupts anything that orders or expires results.
+
 ## Finite watcher nodes
 
 Infinite async generators are not tools. These factories perform exactly one poll or drain step and return serializable checkpoint updates:

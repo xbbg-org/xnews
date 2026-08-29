@@ -198,3 +198,20 @@ test("credentials are redacted in every derived copy and public content survives
   // The cited record's own contact address is public data, not operator PII.
   expect(result.structuredResponse.summary).toContain("analyst@example.com");
 });
+
+// Two of three live providers dated a 2026 result to 2024: a model reports its training
+// era, not the clock, so the runtime stamps the field.
+test("the analyst stamps generatedAt instead of trusting the model", async () => {
+  const before = Date.now();
+  const analyst = createXnewsAnalyst({ model: new LeakingResultModel({}) });
+  const result = await analyst.invoke(
+    { messages: [{ role: "user", content: "Summarize the fixture." }] },
+    { context: {} },
+  );
+
+  // The scripted model returns 2026-08-25T12:00:00.000Z.
+  const stamped = Date.parse(result.structuredResponse.generatedAt);
+  expect(Number.isNaN(stamped)).toBeFalse();
+  expect(stamped).toBeGreaterThanOrEqual(before);
+  expect(stamped).toBeLessThanOrEqual(Date.now());
+});
