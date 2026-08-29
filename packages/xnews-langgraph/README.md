@@ -149,6 +149,27 @@ internally inconsistent. A model without a clock treats retrieved items newer th
 as hypothetical and hedges the analysis accordingly. The date and rule accompany a custom
 `systemPrompt` as well as the default one.
 
+### Citations
+
+Every digest item carries a short `ref`, and the analyst is told to cite it. An item's own id is
+`provider|guid|title` and can run past 260 characters; a model asked to quote that truncates it,
+and the citation no longer matches anything. `collectXnewsEvidence(state.messages)` indexes what
+the tools reported, and `resolveXnewsCitation(citation, evidence)` accepts a `ref`, a full id, or
+the truncated prefix, returning the recorded url, title, provider, and publication date.
+
+```ts
+import { collectXnewsEvidence, resolveXnewsCitation } from "@xbbg/xnews-langgraph";
+
+const evidence = collectXnewsEvidence(state.messages);
+for (const source of state.structuredResponse.sources) {
+  const record = resolveXnewsCitation(source.id, evidence);
+  console.log(record?.url ?? "unresolved citation", record?.publishedAt);
+}
+```
+
+A citation that resolves to nothing is left exactly as the model wrote it: inventing a match would
+hide a fabricated source that a reviewer needs to see.
+
 ## Finite watcher nodes
 
 Infinite async generators are not tools. These factories perform exactly one poll or drain step and return serializable checkpoint updates:

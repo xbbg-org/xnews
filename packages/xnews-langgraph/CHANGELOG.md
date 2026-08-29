@@ -10,6 +10,10 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 - `structuredResponse.generatedAt` is stamped by the runtime when the result is parsed instead of being taken from the model. Asked for a result over live 2026 articles, two of three providers dated it to 2024 and one flagged the current articles as "predictive or speculative" — a model reports its training era, not the clock.
 - Every model call now carries the current UTC date and the rule that goes with it: judge tool dates against that date rather than against training data, and do not discount an item solely because it postdates what the model recalls, while still questioning a record that is malformed or internally inconsistent. Without a clock a model treats anything newer than its training as hypothetical: `gemini-2.5-flash` reported live articles as "predictive or speculative rather than current news" and listed their dates as a limitation of the analysis. Both disappear once the date is supplied. The date and rule are restated per model call and accompany a custom `systemPrompt` as well as the default one.
 
+### Added
+
+- Digest items carry a short `ref`, and `collectXnewsEvidence` / `resolveXnewsCitation` turn a citation back into the record the tools returned. A news item's own id is `provider|guid|title` and runs past 260 characters, so a model asked to cite it truncates at the `provider|guid` boundary: measured live across three providers, no cited id matched the id the model had been shown, and every one matched once the trailing title was stripped. Citations are now 12 characters and resolve exactly — 4/4 on every provider — and the index still accepts a full id or a truncated prefix so existing callers keep working. `ref` is a hash of the raw id, so a host can recompute it from the record it holds even when the digest truncated the id.
+
 ## [0.2.2] - 2026-08-29
 
 ### Fixed

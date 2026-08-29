@@ -18,6 +18,9 @@ export type {
 } from "./context.js";
 
 export { createXnewsToolOutput, redactText, redactUrl, stableStringify } from "./digest.js";
+export { citationRef } from "./digest.js";
+export { collectXnewsEvidence, resolveXnewsCitation } from "./evidence.js";
+export type { XnewsEvidenceItem } from "./evidence.js";
 export type {
   XnewsByteArtifact,
   XnewsDigestOmissions,

@@ -99,6 +99,32 @@ const DEFAULT_DIGEST_CAPS: Readonly<Record<XnewsToolName, Required<XnewsDigestCa
   xnews_catalog: { maxItems: 20, maxCharacters: 8_000, maxWarnings: 4, maxSources: 8 },
 };
 
+/**
+ * Gives an item a short citation handle.
+ *
+ * A news item's own id is `provider|guid|title` and runs to hundreds of characters, so a model
+ * asked to cite it truncates at the `provider|guid` boundary: measured live, every citation from
+ * three providers failed to match the id it was shown, while matching once the title was
+ * stripped. `ref` is a 12-character digest of that id — short enough to quote exactly, stable
+ * across calls, and derived rather than assigned so identical tool output stays byte-identical.
+ *
+ * The hash is taken from the raw id, never the summarized copy: a summary truncates a string past
+ * 512 characters, and a ref hashed from the truncation could not be recomputed from the record a
+ * host holds.
+ */
+function withCitationRef(raw: unknown, summarized: unknown): unknown {
+  if (!isRecord(summarized)) return summarized;
+  const id = isRecord(raw) ? raw["id"] : undefined;
+  if (typeof id !== "string" || id.length === 0) return summarized;
+  if (typeof summarized["ref"] === "string") return summarized;
+  return { ...summarized, ref: citationRef(id) };
+}
+
+/** The handle a host resolves a citation with; recomputable from any item id. */
+export function citationRef(id: string): string {
+  return createHash("sha256").update(id).digest("hex").slice(0, 12);
+}
+
 export function createXnewsToolOutput(
   input: XnewsToolOutputOptions,
 ): readonly [content: string, artifact: XnewsToolArtifact] {
@@ -109,7 +135,7 @@ export function createXnewsToolOutput(
   const sourceValues = input.sources ?? [];
   const selectedItems = itemValues
     .slice(0, caps.maxItems)
-    .map((item) => summarizeValue(item, secrets));
+    .map((item) => withCitationRef(item, summarizeValue(item, secrets)));
   const warnings = warningValues.slice(0, caps.maxWarnings).map(() => "Provider warning");
   const sources = sourceValues
     .slice(0, caps.maxSources)
