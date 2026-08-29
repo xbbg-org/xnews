@@ -4,6 +4,8 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-29
+
 ### Fixed
 
 - Runtime-secret collection no longer turns ordinary OCR settings into redaction patterns. Every nested string under `context.ocr` was treated as a secret, so an `imageMode` of `"base"` rewrote the word "database" in public provider text and a `model` of `"Unlimited-OCR"` would blank the model name wherever it appeared. Only `ocr.apiKey`, `ocr.baseUrl`, and values under credential-named keys inside `ocr.extraBody` are collected now; `0.2.1` shipped with the wider collection.
@@ -33,6 +35,7 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 - Public Zod 3.25.76 and Zod 4.2.0 compatible schemas, stable TypeScript types, and exhaustive capability registries.
 - Exact-floor packaged-install smoke coverage for both supported Zod majors.
 
-[Unreleased]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.2.1...HEAD
+[Unreleased]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.2.2...HEAD
+[0.2.2]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.2.1...xnews-langgraph-v0.2.2
 [0.2.1]: https://github.com/xbbg-org/xnews/compare/xnews-langgraph-v0.1.0...xnews-langgraph-v0.2.1
 [0.1.0]: https://github.com/xbbg-org/xnews/releases/tag/xnews-langgraph-v0.1.0
