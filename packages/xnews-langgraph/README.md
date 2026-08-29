@@ -5,7 +5,7 @@ Provider-agnostic LangChain tools, finite LangGraph nodes, and a starter analyst
 ## Requirements
 
 - Node.js 24 or newer
-- `@xbbg/xnews ^0.2.1`
+- `@xbbg/xnews ^0.2.2`
 - `@langchain/core ^1.2.9`
 - `@langchain/langgraph ^1.4.12`
 - `langchain ^1.5.10`
