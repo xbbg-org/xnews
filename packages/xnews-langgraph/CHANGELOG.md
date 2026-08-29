@@ -8,6 +8,7 @@ All notable changes to `@xbbg/xnews-langgraph` are documented in this file.
 
 - Credential field names are matched by word instead of by substring. `secretary`, `tokenCount`, `cookieBanner`, and `credentialsPolicy` were treated as credentials and blanked in digests, artifacts, and node state; a name now qualifies only when its last word is a credential word, so `apiKey`, `access_token`, and `clientSecret` still match.
 - `structuredResponse.generatedAt` is stamped by the runtime when the result is parsed instead of being taken from the model. Asked for a result over live 2026 articles, two of three providers dated it to 2024 and one flagged the current articles as "predictive or speculative" — a model reports its training era, not the clock.
+- Every model call now carries the current UTC date and a rule that tool dates are authoritative. Without a clock a model treats anything newer than its training as hypothetical: `gemini-2.5-flash` reported live articles as "predictive or speculative rather than current news" and listed their dates as a limitation of the analysis. Both disappear once the date is supplied. The date is restated per model call, so an analyst instance that outlives the day it was constructed does not go stale.
 
 ## [0.2.2] - 2026-08-29
 

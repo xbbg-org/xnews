@@ -215,3 +215,69 @@ test("the analyst stamps generatedAt instead of trusting the model", async () =>
   expect(stamped).toBeGreaterThanOrEqual(before);
   expect(stamped).toBeLessThanOrEqual(Date.now());
 });
+
+/** Records the system prompt each model call receives. */
+class PromptCapturingModel extends BaseChatModel {
+  readonly systemPrompts: string[] = [];
+  #tools: BindToolsInput[] = [];
+
+  _llmType(): string {
+    return "prompt-capturing-xnews";
+  }
+
+  override bindTools(tools: BindToolsInput[]): this {
+    this.#tools = tools;
+    return this;
+  }
+
+  async _generate(messages: BaseMessage[]): Promise<ChatResult> {
+    // A dynamic system prompt arrives as content blocks beside the static one.
+    const system = messages.find((message) => message.getType() === "system");
+    const content: unknown = system?.content;
+    if (typeof content === "string") this.systemPrompts.push(content);
+    else if (Array.isArray(content)) {
+      this.systemPrompts.push(
+        content
+          .map((block) =>
+            isRecord(block) && typeof block["text"] === "string" ? block["text"] : "",
+          )
+          .join("\n"),
+      );
+    }
+    const structuredTool = this.#tools
+      .map(boundToolName)
+      .find(
+        (name) => name !== undefined && !(XNEWS_TOOL_NAMES as readonly string[]).includes(name),
+      );
+    if (structuredTool === undefined) throw new Error("Structured response tool was not bound");
+    return responseWithToolCall(
+      structuredTool,
+      {
+        summary: "Fixture summary.",
+        claims: [{ statement: "One claim.", evidence: ["fixture"], confidence: 1 }],
+        sources: [{ id: "fixture", provider: "fixture" }],
+        uncertainty: [],
+        limitations: ["Fixture-only analysis."],
+        providerDiagnostics: [{ provider: "fixture", status: "ok", warningCount: 0 }],
+        generatedAt: "2024-01-01T00:00:00.000Z",
+      },
+      "structured-prompt",
+    );
+  }
+}
+
+// Without a clock, gemini-2.5-flash called live 2026 articles "predictive or speculative"
+// and dated its own result to 2024.
+test("each model call carries the current date and a rule that tool dates win", async () => {
+  const model = new PromptCapturingModel({});
+  const analyst = createXnewsAnalyst({ model });
+  await analyst.invoke(
+    { messages: [{ role: "user", content: "Summarize the fixture." }] },
+    { context: {} },
+  );
+
+  const prompt = model.systemPrompts.at(0) ?? "";
+  expect(prompt).toContain(`The current date is ${new Date().toISOString().slice(0, 10)} (UTC)`);
+  expect(prompt).toContain("their dates are authoritative");
+  expect(prompt).toContain("postdating your training");
+});

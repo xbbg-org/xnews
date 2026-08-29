@@ -142,6 +142,11 @@ The package chooses no persistence backend.
 discarded. A model reports its training era rather than the clock, and dating an analysis
 two years into the past silently corrupts anything that orders or expires results.
 
+Each model call carries the current UTC date and a rule that tool dates outrank the model's
+sense of "now". A model without a clock treats retrieved items newer than its training as
+hypothetical and hedges the analysis accordingly. Supplying `systemPrompt` replaces the
+default text; the date line is appended to whichever prompt is in force.
+
 ## Finite watcher nodes
 
 Infinite async generators are not tools. These factories perform exactly one poll or drain step and return serializable checkpoint updates:

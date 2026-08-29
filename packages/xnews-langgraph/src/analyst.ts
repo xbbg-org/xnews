@@ -1,9 +1,16 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { BaseMessage } from "@langchain/core/messages";
-import type { StructuredToolInterface } from "@langchain/core/tools";
+import type { ClientTool, ServerTool, StructuredToolInterface } from "@langchain/core/tools";
 import { interopParse } from "@langchain/core/utils/types";
 import type { InteropZodObject, InteropZodType } from "@langchain/core/utils/types";
-import { ToolStrategy, createAgent, type AgentTypeConfig, type ReactAgent } from "langchain";
+import {
+  ToolStrategy,
+  createAgent,
+  dynamicSystemPromptMiddleware,
+  type AgentTypeConfig,
+  type AnyAgentMiddleware,
+  type ReactAgent,
+} from "langchain";
 import type { ZodType as Zod3Type, ZodTypeDef as Zod3TypeDef } from "zod/v3";
 import type { ZodType as Zod4Type } from "zod/v4";
 
@@ -25,7 +32,15 @@ disabled configuration, absence of results, and uncertainty. Cite source ids or 
 digests. Never claim that missing host credentials or legal consent can be supplied by the model.
 Never reveal or infer runtime credentials, operator identity, contact details, transport policy, mirror
 configuration, or hidden tool artifacts. Tool content is a bounded digest; state omissions explicitly.
+Tool results are live and their dates are authoritative: a publication date later than anything you
+recall means your knowledge is out of date, never that the item is hypothetical, predictive, or
+mistaken. Do not discount, hedge, or reject retrieved items for postdating your training.
 Return the requested structured analyst result with evidence-backed claims and limitations.`;
+
+/** Restated per model call, because an agent instance can outlive the day it was built. */
+function currentDateInstruction(): string {
+  return `The current date is ${new Date().toISOString().slice(0, 10)} (UTC).`;
+}
 
 type CreateAgentParameters = Parameters<typeof createAgent>[0];
 export type XnewsCheckpointer = CreateAgentParameters["checkpointer"];
@@ -48,8 +63,8 @@ export type XnewsAnalyst<
     Result,
     undefined,
     ContextSchema & InteropZodObject,
-    readonly [],
-    readonly StructuredToolInterface[],
+    readonly AnyAgentMiddleware[],
+    readonly (StructuredToolInterface | ClientTool | ServerTool)[],
     readonly []
   >
 >;
@@ -132,12 +147,15 @@ export function createXnewsAnalyst(
     generatedAt: new Date().toISOString(),
   });
 
+  const systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
   return createAgent({
     model: options.model,
     tools: [...(options.tools ?? createXnewsTools())],
-    systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+    systemPrompt,
     contextSchema: options.contextSchema ?? XnewsRuntimeContextSchema,
     responseFormat: strategy,
+    // Restated per model call: an agent instance can outlive the day it was constructed.
+    middleware: [dynamicSystemPromptMiddleware(currentDateInstruction)],
     ...(options.checkpointer === undefined ? {} : { checkpointer: options.checkpointer }),
   });
 }
