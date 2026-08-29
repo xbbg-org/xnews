@@ -99,3 +99,73 @@ test("the ref survives an id longer than the summary truncation limit", () => {
   ]);
   expect(resolveXnewsCitation(citationRef(hugeId), evidence)?.provider).toBe("google-news");
 });
+
+// The same guid republished under a revised headline yields two records sharing the prefix a
+// model truncates to. Resolving that to whichever arrived first would cite the wrong record while
+// looking exact.
+test("a prefix claimed by two records resolves to neither", () => {
+  const guid = "google-news|CBMiRefreshedGuid";
+  const first = `${guid}|Chip curbs tightened`;
+  const second = `${guid}|Chip curbs tightened, allies join`;
+  const [content] = createXnewsToolOutput({
+    tool: "xnews_news",
+    operation: "topic",
+    status: "ok",
+    data: { items: [] },
+    items: [
+      {
+        id: first,
+        title: "Chip curbs tightened",
+        url: "https://news.test/v1",
+        provider: "google-news",
+      },
+      {
+        id: second,
+        title: "Chip curbs tightened, allies join",
+        url: "https://news.test/v2",
+        provider: "google-news",
+      },
+    ],
+    counts: { items: 2 },
+    context: {},
+  });
+  const evidence = collectXnewsEvidence([
+    new ToolMessage({ content, tool_call_id: "dupe", name: "xnews_news" }),
+  ]);
+
+  // Each record still resolves by its own ref and by its own full id.
+  expect(resolveXnewsCitation(citationRef(first), evidence)?.url).toBe("https://news.test/v1");
+  expect(resolveXnewsCitation(citationRef(second), evidence)?.url).toBe("https://news.test/v2");
+  expect(resolveXnewsCitation(first, evidence)?.url).toBe("https://news.test/v1");
+  expect(resolveXnewsCitation(second, evidence)?.url).toBe("https://news.test/v2");
+  // The contested prefix answers for neither.
+  expect(resolveXnewsCitation(guid, evidence)).toBeUndefined();
+});
+
+test("an id that is itself a prefix keeps its record when another id extends it", () => {
+  const bare = "google-news|CBMiSharedGuid";
+  const extended = `${bare}|A later headline`;
+  const [content] = createXnewsToolOutput({
+    tool: "xnews_news",
+    operation: "topic",
+    status: "ok",
+    data: { items: [] },
+    items: [
+      { id: bare, title: "Bare", url: "https://news.test/bare", provider: "google-news" },
+      {
+        id: extended,
+        title: "Extended",
+        url: "https://news.test/extended",
+        provider: "google-news",
+      },
+    ],
+    counts: { items: 2 },
+    context: {},
+  });
+  const evidence = collectXnewsEvidence([
+    new ToolMessage({ content, tool_call_id: "shared", name: "xnews_news" }),
+  ]);
+
+  expect(resolveXnewsCitation(bare, evidence)?.url).toBe("https://news.test/bare");
+  expect(resolveXnewsCitation(extended, evidence)?.url).toBe("https://news.test/extended");
+});

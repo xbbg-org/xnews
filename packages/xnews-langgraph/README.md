@@ -168,7 +168,9 @@ for (const source of state.structuredResponse.sources) {
 ```
 
 A citation that resolves to nothing is left exactly as the model wrote it: inventing a match would
-hide a fabricated source that a reviewer needs to see.
+hide a fabricated source that a reviewer needs to see. The truncated prefix is a guess rather than
+an identity, so when two records share it — the same guid republished under a revised headline —
+it resolves to neither, while each record still resolves by its own `ref` or full id.
 
 ## Finite watcher nodes
 
