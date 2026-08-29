@@ -99,36 +99,51 @@ const DEFAULT_DIGEST_CAPS: Readonly<Record<XnewsToolName, Required<XnewsDigestCa
   xnews_catalog: { maxItems: 20, maxCharacters: 8_000, maxWarnings: 4, maxSources: 8 },
 };
 
+/** The identity a citation handle is derived from. */
+export interface XnewsCitationScope {
+  readonly tool: string;
+  /** Provider that issued the id, where the record names one. */
+  readonly provider?: string | undefined;
+  readonly id: string;
+}
+
 /**
  * Gives an item a short citation handle.
  *
  * A news item's own id is `provider|guid|title` and runs to hundreds of characters, so a model
  * asked to cite it truncates at the `provider|guid` boundary: measured live, every citation from
  * three providers failed to match the id it was shown, while matching once the title was
- * stripped. `ref` is a 12-character digest of that id — short enough to quote exactly, stable
- * across calls, and derived rather than assigned so identical tool output stays byte-identical.
+ * stripped. `ref` is a short digest of the item's identity — quotable exactly, stable across
+ * calls, and derived rather than assigned so identical tool output stays byte-identical.
  *
- * The hash is taken from the raw id, never the summarized copy: a summary truncates a string past
- * 512 characters, and a ref hashed from the truncation could not be recomputed from the record a
- * host holds.
+ * The hash is taken from the raw item, never the summarized copy: a summary truncates a string
+ * past 512 characters, and a ref hashed from the truncation could not be recomputed from the
+ * record a host holds.
  */
-function withCitationRef(raw: unknown, summarized: unknown): unknown {
+function withCitationRef(tool: string, raw: unknown, summarized: unknown): unknown {
   if (!isRecord(summarized)) return summarized;
   const id = isRecord(raw) ? raw["id"] : undefined;
   if (typeof id !== "string" || id.length === 0) return summarized;
+  const provider = isRecord(raw) ? raw["provider"] : undefined;
   // `ref` is reserved. An upstream record carrying its own `ref` would otherwise choose the handle
   // a citation resolves through, and provider payloads are attacker-influenced.
-  return { ...summarized, ref: citationRef(id) };
+  return {
+    ...summarized,
+    ref: citationRef({ tool, id, ...(typeof provider === "string" ? { provider } : {}) }),
+  };
 }
 
 /**
- * The handle a host resolves a citation with; recomputable from any item id.
+ * The handle a host resolves a citation with; recomputable from the record a host holds.
  *
- * 96 bits, not the 48 a shorter prefix would give: provider content is attacker-influenced, and
- * grinding a 48-bit collision to make one item resolve as another is roughly 2^24 work.
+ * The identity is namespaced, not the bare id: an event id is unique only within its provider, so
+ * two providers reporting alert `1` in one `across` result would otherwise share a handle and
+ * resolve to whichever arrived first. 96 bits, not the 48 a shorter prefix would give, because
+ * provider content is attacker-influenced and grinding a 48-bit collision is roughly 2^24 work.
  */
-export function citationRef(id: string): string {
-  return createHash("sha256").update(id).digest("hex").slice(0, 24);
+export function citationRef(scope: XnewsCitationScope): string {
+  const identity = [scope.tool, scope.provider ?? "", scope.id].join("\u0000");
+  return createHash("sha256").update(identity).digest("hex").slice(0, 24);
 }
 
 export function createXnewsToolOutput(
@@ -141,7 +156,7 @@ export function createXnewsToolOutput(
   const sourceValues = input.sources ?? [];
   const selectedItems = itemValues
     .slice(0, caps.maxItems)
-    .map((item) => withCitationRef(item, summarizeValue(item, secrets)));
+    .map((item) => withCitationRef(input.tool, item, summarizeValue(item, secrets)));
   const warnings = warningValues.slice(0, caps.maxWarnings).map(() => "Provider warning");
   const sources = sourceValues
     .slice(0, caps.maxSources)

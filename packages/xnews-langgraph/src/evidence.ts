@@ -45,6 +45,8 @@ export function collectXnewsEvidence(
   const prefixOwners = new Map<string, Set<string>>();
   // A ref is a hash of the item id, so one ref naming two ids means a collision, not a record.
   const refOwners = new Map<string, Set<string>>();
+  // An id is unique only within its provider, so a contested id names no single record either.
+  const idOwners = new Map<string, Set<string>>();
 
   for (const message of messages) {
     if (!ToolMessage.isInstance(message) || typeof message.content !== "string") continue;
@@ -62,19 +64,34 @@ export function collectXnewsEvidence(
       if (!isRecord(item)) continue;
       const id = stringField(item, "id");
       if (id === undefined) continue;
+      const tool = stringField(digest, "tool");
+      const provider = stringField(item, "provider");
+      const scope = {
+        tool: tool ?? "",
+        id,
+        ...(provider === undefined ? {} : { provider }),
+      };
       const entry: XnewsEvidenceItem = {
-        ref: stringField(item, "ref") ?? citationRef(id),
+        ref: stringField(item, "ref") ?? citationRef(scope),
         id,
         title: stringField(item, "title"),
         url: stringField(item, "url"),
-        provider: stringField(item, "provider"),
+        provider,
         publishedAt: stringField(item, "publishedAt"),
-        tool: stringField(digest, "tool"),
+        tool,
       };
-      // The ref and the full id identify one record; both are exact.
-      const refIds = refOwners.get(entry.ref) ?? new Set<string>();
-      refIds.add(id);
-      refOwners.set(entry.ref, refIds);
+
+      // A ref names one identity. Two identities under one ref is a collision, not a record.
+      const identity = [scope.tool, provider ?? "", id].join("\u0000");
+      const refIdentities = refOwners.get(entry.ref) ?? new Set<string>();
+      refIdentities.add(identity);
+      refOwners.set(entry.ref, refIdentities);
+      // A bare id is unique only within its provider: an `across` result can carry alert `1` from
+      // two providers, and citing `1` names neither.
+      const idRefs = idOwners.get(id) ?? new Set<string>();
+      idRefs.add(entry.ref);
+      idOwners.set(id, idRefs);
+
       for (const key of [entry.ref, id]) {
         if (key.length > 0 && !evidence.has(key)) evidence.set(key, entry);
       }
@@ -92,8 +109,11 @@ export function collectXnewsEvidence(
     const claimed = evidence.get(prefix);
     if (owners.size > 1 && claimed !== undefined && claimed.id !== prefix) evidence.delete(prefix);
   }
-  for (const [ref, ids] of refOwners) {
-    if (ids.size > 1) evidence.delete(ref);
+  for (const [ref, identities] of refOwners) {
+    if (identities.size > 1) evidence.delete(ref);
+  }
+  for (const [id, refs] of idOwners) {
+    if (refs.size > 1) evidence.delete(id);
   }
   return evidence;
 }

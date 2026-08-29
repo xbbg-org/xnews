@@ -15,6 +15,11 @@ const LONG_ID =
   "google-news|CBMifEFVX3lxTFBZMDY3TVNCdDRkUURTVjFlUVVybWgwR2U5bmM3VHNVLVl6T09NR210S3hILWhY|Strengthening the U.S. Export Control Regime - The Foundation for American Innovation";
 const PREFIX = LONG_ID.split("|").slice(0, 2).join("|");
 
+/** Every fixture here is a news item from `google-news`, so the scope is fixed. */
+function newsRef(id: string): string {
+  return citationRef({ tool: "xnews_news", provider: "google-news", id });
+}
+
 function newsDigest(): ToolMessage {
   const [content, artifact] = createXnewsToolOutput({
     tool: "xnews_news",
@@ -44,16 +49,16 @@ test("digest items carry a short citation ref derived from the item id", () => {
   expect(isRecord(item)).toBeTrue();
   if (!isRecord(item)) return;
 
-  expect(item["ref"]).toBe(citationRef(LONG_ID));
+  expect(item["ref"]).toBe(newsRef(LONG_ID));
   expect(String(item["ref"])).toHaveLength(24);
   // Derived, not assigned, so identical tool output stays byte-identical.
-  expect(citationRef(LONG_ID)).toBe(citationRef(LONG_ID));
-  expect(citationRef(LONG_ID)).not.toBe(citationRef(PREFIX));
+  expect(newsRef(LONG_ID)).toBe(newsRef(LONG_ID));
+  expect(newsRef(LONG_ID)).not.toBe(newsRef(PREFIX));
 });
 
 test("a citation resolves from a ref, a full id, or the prefix a model truncates to", () => {
   const evidence = collectXnewsEvidence([newsDigest()]);
-  for (const citation of [citationRef(LONG_ID), LONG_ID, PREFIX]) {
+  for (const citation of [newsRef(LONG_ID), LONG_ID, PREFIX]) {
     const resolved = resolveXnewsCitation(citation, evidence);
     expect(resolved?.id, `resolves ${citation.slice(0, 20)}`).toBe(LONG_ID);
     expect(resolved?.url).toBe("https://news.google.com/rss/articles/CBMifEFVX3lxTFBZ?oc=5");
@@ -91,13 +96,13 @@ test("the ref survives an id longer than the summary truncation limit", () => {
 
   // The id the model sees is truncated; the ref is not derived from that truncation.
   expect(String(item["id"])).toEndWith("…");
-  expect(item["ref"]).toBe(citationRef(hugeId));
-  expect(item["ref"]).not.toBe(citationRef(String(item["id"])));
+  expect(item["ref"]).toBe(newsRef(hugeId));
+  expect(item["ref"]).not.toBe(newsRef(String(item["id"])));
 
   const evidence = collectXnewsEvidence([
     new ToolMessage({ content, tool_call_id: "huge", name: "xnews_news" }),
   ]);
-  expect(resolveXnewsCitation(citationRef(hugeId), evidence)?.provider).toBe("google-news");
+  expect(resolveXnewsCitation(newsRef(hugeId), evidence)?.provider).toBe("google-news");
 });
 
 // The same guid republished under a revised headline yields two records sharing the prefix a
@@ -134,8 +139,8 @@ test("a prefix claimed by two records resolves to neither", () => {
   ]);
 
   // Each record still resolves by its own ref and by its own full id.
-  expect(resolveXnewsCitation(citationRef(first), evidence)?.url).toBe("https://news.test/v1");
-  expect(resolveXnewsCitation(citationRef(second), evidence)?.url).toBe("https://news.test/v2");
+  expect(resolveXnewsCitation(newsRef(first), evidence)?.url).toBe("https://news.test/v1");
+  expect(resolveXnewsCitation(newsRef(second), evidence)?.url).toBe("https://news.test/v2");
   expect(resolveXnewsCitation(first, evidence)?.url).toBe("https://news.test/v1");
   expect(resolveXnewsCitation(second, evidence)?.url).toBe("https://news.test/v2");
   // The contested prefix answers for neither.
@@ -178,19 +183,27 @@ test("an upstream ref never becomes the citation handle", () => {
     operation: "topic",
     status: "ok",
     data: { items: [] },
-    items: [{ id, ref: "attacker-chosen", title: "Headline", url: "https://news.test/x" }],
+    items: [
+      {
+        id,
+        ref: "attacker-chosen",
+        title: "Headline",
+        url: "https://news.test/x",
+        provider: "google-news",
+      },
+    ],
     counts: { items: 1 },
     context: {},
   });
   const digest: unknown = JSON.parse(content);
   const item = isRecord(digest) && Array.isArray(digest["items"]) ? digest["items"][0] : undefined;
-  expect(isRecord(item) ? item["ref"] : undefined).toBe(citationRef(id));
+  expect(isRecord(item) ? item["ref"] : undefined).toBe(newsRef(id));
 
   const evidence = collectXnewsEvidence([
     new ToolMessage({ content, tool_call_id: "own-ref", name: "xnews_news" }),
   ]);
   expect(resolveXnewsCitation("attacker-chosen", evidence)).toBeUndefined();
-  expect(resolveXnewsCitation(citationRef(id), evidence)?.url).toBe("https://news.test/x");
+  expect(resolveXnewsCitation(newsRef(id), evidence)?.url).toBe("https://news.test/x");
 });
 
 /** A digest presenting one handle for two different ids is a collision, not a record. */
@@ -211,4 +224,35 @@ test("one ref naming two records resolves to neither", () => {
   expect(resolveXnewsCitation("collided", evidence)).toBeUndefined();
   expect(resolveXnewsCitation("google-news|one|A", evidence)?.url).toBe("https://news.test/one");
   expect(resolveXnewsCitation("google-news|two|B", evidence)?.url).toBe("https://news.test/two");
+});
+
+// An event id is unique only within its provider. An `across` result can carry alert `1` from two
+// providers, and a bare id hash would have given them one handle.
+test("two providers reporting the same id get distinct handles", () => {
+  const [content] = createXnewsToolOutput({
+    tool: "xnews_events",
+    operation: "across",
+    status: "ok",
+    data: { events: [] },
+    items: [
+      { id: "1", provider: "nws", title: "Flood warning", url: "https://alerts.test/nws/1" },
+      { id: "1", provider: "gdacs", title: "Cyclone alert", url: "https://alerts.test/gdacs/1" },
+    ],
+    counts: { events: 2 },
+    context: {},
+  });
+  const digest: unknown = JSON.parse(content);
+  const items = isRecord(digest) && Array.isArray(digest["items"]) ? digest["items"] : [];
+  const refs = items.map((item) => (isRecord(item) ? item["ref"] : undefined));
+  expect(new Set(refs).size, "each provider gets its own handle").toBe(2);
+
+  const evidence = collectXnewsEvidence([
+    new ToolMessage({ content, tool_call_id: "across", name: "xnews_events" }),
+  ]);
+  const nws = citationRef({ tool: "xnews_events", provider: "nws", id: "1" });
+  const gdacs = citationRef({ tool: "xnews_events", provider: "gdacs", id: "1" });
+  expect(resolveXnewsCitation(nws, evidence)?.url).toBe("https://alerts.test/nws/1");
+  expect(resolveXnewsCitation(gdacs, evidence)?.url).toBe("https://alerts.test/gdacs/1");
+  // The bare id names neither record, so it must not answer for one of them.
+  expect(resolveXnewsCitation("1", evidence)).toBeUndefined();
 });
