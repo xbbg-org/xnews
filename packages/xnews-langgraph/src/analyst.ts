@@ -32,14 +32,19 @@ disabled configuration, absence of results, and uncertainty. Cite source ids or 
 digests. Never claim that missing host credentials or legal consent can be supplied by the model.
 Never reveal or infer runtime credentials, operator identity, contact details, transport policy, mirror
 configuration, or hidden tool artifacts. Tool content is a bounded digest; state omissions explicitly.
-Tool results are live and their dates are authoritative: a publication date later than anything you
-recall means your knowledge is out of date, never that the item is hypothetical, predictive, or
-mistaken. Do not discount, hedge, or reject retrieved items for postdating your training.
 Return the requested structured analyst result with evidence-backed claims and limitations.`;
 
-/** Restated per model call, because an agent instance can outlive the day it was built. */
+/**
+ * Carried by every model call, alongside a custom `systemPrompt` as well as the default one,
+ * and restated per call because an agent instance can outlive the day it was constructed.
+ * Without it a model dates the world from its training data: asked about live 2026 articles,
+ * one provider called them "predictive or speculative rather than current news".
+ */
 function currentDateInstruction(): string {
-  return `The current date is ${new Date().toISOString().slice(0, 10)} (UTC).`;
+  return `The current date is ${new Date().toISOString().slice(0, 10)} (UTC). Tool results report
+their own dates; judge them against the current date rather than against your training data, and do
+not discount or hedge an item solely because it postdates what you recall. Question a date only when
+the record itself is malformed or inconsistent with its own contents.`;
 }
 
 type CreateAgentParameters = Parameters<typeof createAgent>[0];

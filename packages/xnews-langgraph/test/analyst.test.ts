@@ -267,17 +267,30 @@ class PromptCapturingModel extends BaseChatModel {
 }
 
 // Without a clock, gemini-2.5-flash called live 2026 articles "predictive or speculative"
-// and dated its own result to 2024.
-test("each model call carries the current date and a rule that tool dates win", async () => {
-  const model = new PromptCapturingModel({});
-  const analyst = createXnewsAnalyst({ model });
-  await analyst.invoke(
+// and dated its own result to 2024. The rule travels with the date, so a host that replaces
+// the system prompt still gets it.
+test("each model call carries the current date and the freshness rule", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const withDefault = new PromptCapturingModel({});
+  await createXnewsAnalyst({ model: withDefault }).invoke(
+    { messages: [{ role: "user", content: "Summarize the fixture." }] },
+    { context: {} },
+  );
+  const custom = new PromptCapturingModel({});
+  await createXnewsAnalyst({ model: custom, systemPrompt: "Answer tersely." }).invoke(
     { messages: [{ role: "user", content: "Summarize the fixture." }] },
     { context: {} },
   );
 
-  const prompt = model.systemPrompts.at(0) ?? "";
-  expect(prompt).toContain(`The current date is ${new Date().toISOString().slice(0, 10)} (UTC)`);
-  expect(prompt).toContain("their dates are authoritative");
-  expect(prompt).toContain("postdating your training");
+  for (const [label, model] of [
+    ["default prompt", withDefault],
+    ["custom prompt", custom],
+  ] as const) {
+    const prompt = model.systemPrompts.at(0) ?? "";
+    expect(prompt, `${label} carries the date`).toContain(`The current date is ${today} (UTC)`);
+    expect(prompt, `${label} carries the rule`).toContain("judge them against the current date");
+    expect(prompt, `${label} allows real skepticism`).toContain("malformed or inconsistent");
+  }
+  expect(custom.systemPrompts.at(0)).toContain("Answer tersely.");
 });

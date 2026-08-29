@@ -142,10 +142,12 @@ The package chooses no persistence backend.
 discarded. A model reports its training era rather than the clock, and dating an analysis
 two years into the past silently corrupts anything that orders or expires results.
 
-Each model call carries the current UTC date and a rule that tool dates outrank the model's
-sense of "now". A model without a clock treats retrieved items newer than its training as
-hypothetical and hedges the analysis accordingly. Supplying `systemPrompt` replaces the
-default text; the date line is appended to whichever prompt is in force.
+Each model call carries the current UTC date and the rule that goes with it: judge tool dates
+against that date rather than against training data, and do not discount an item solely because
+it postdates what the model recalls, while still questioning a record that is malformed or
+internally inconsistent. A model without a clock treats retrieved items newer than its training
+as hypothetical and hedges the analysis accordingly. The date and rule accompany a custom
+`systemPrompt` as well as the default one.
 
 ## Finite watcher nodes
 
